@@ -1,22 +1,24 @@
 [gd_scene format=3 uid="uid://bxkr3wyjwiun5"]
 
-[ext_resource type="Texture2D" uid="uid://dr06sragmd1ub" path="res://maps/world_map.png" id="1_glv2v"]
-[ext_resource type="Texture2D" uid="uid://bee8qmnskxkec" path="res://characters/hero_walk.png" id="2_uu6xs"]
+[ext_resource type="Texture2D" uid="uid://dr06sragmd1ub" path="res://maps/world_map.png" id="1_map"]
+[ext_resource type="Texture2D" uid="uid://b1sravq0ivglf" path="res://characters/hero_single.png" id="2_hero"]
+[ext_resource type="Script" path="res://Main.gd" id="3_main"]
+[ext_resource type="Script" path="res://Hero.gd" id="4_hero"]
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_uu6xs"]
+[node name="Main" type="Node2D"]
+script = ExtResource("3_main")
 
-[node name="Node2D" type="Node2D" unique_id=1614888657]
+[node name="WorldMap" type="Sprite2D" parent="."]
+position = Vector2(640, 360)
+scale = Vector2(0.765, 0.765)
+texture = ExtResource("1_map")
 
-[node name="WorldMap" type="Sprite2D" parent="." unique_id=1831811698]
-position = Vector2(12, -53)
-texture = ExtResource("1_glv2v")
+[node name="Hero" type="Node2D" parent="."]
+position = Vector2(220, 490)
+script = ExtResource("4_hero")
 
-[node name="Hero" type="CharacterBody2D" parent="." unique_id=1579546186]
-
-[node name="Sprite2D" type="Sprite2D" parent="Hero" unique_id=59762889]
-position = Vector2(-425.24936, -182.1717)
-scale = Vector2(0.1, 0.1)
-texture = ExtResource("2_uu6xs")
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Hero" unique_id=370929445]
-shape = SubResource("RectangleShape2D_uu6xs")
+[node name="Sprite2D" type="Sprite2D" parent="Hero"]
+scale = Vector2(0.13, 0.13)
+texture = ExtResource("2_hero")
+region_enabled = true
+region_rect = Rect2(0, 0, 349, 584)
