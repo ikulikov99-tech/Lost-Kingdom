@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://bxkr3wyjwiun5"]
+
+[ext_resource type="Texture2D" uid="uid://dr06sragmd1ub" path="res://maps/world_map.png" id="1_glv2v"]
+[ext_resource type="Texture2D" uid="uid://bee8qmnskxkec" path="res://characters/hero_walk.png" id="2_uu6xs"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_uu6xs"]
+
+[node name="Node2D" type="Node2D" unique_id=1614888657]
+
+[node name="WorldMap" type="Sprite2D" parent="." unique_id=1831811698]
+position = Vector2(12, -53)
+texture = ExtResource("1_glv2v")
+
+[node name="Hero" type="CharacterBody2D" parent="." unique_id=1579546186]
+
+[node name="Sprite2D" type="Sprite2D" parent="Hero" unique_id=59762889]
+position = Vector2(-425.24936, -182.1717)
+scale = Vector2(0.1, 0.1)
+texture = ExtResource("2_uu6xs")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hero" unique_id=370929445]
+shape = SubResource("RectangleShape2D_uu6xs")
