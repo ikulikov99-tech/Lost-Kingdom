@@ -5,16 +5,18 @@
 [ext_resource type="Script" path="res://Main.gd" id="3_main"]
 [ext_resource type="Script" path="res://Hero.gd" id="4_hero"]
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_hero"]
+size = Vector2(40, 60)
+
 [node name="Main" type="Node2D"]
 script = ExtResource("3_main")
 
 [node name="WorldMap" type="Sprite2D" parent="."]
-position = Vector2(640, 360)
-scale = Vector2(0.765, 0.765)
+position = Vector2(12, -53)
 texture = ExtResource("1_map")
 
-[node name="Hero" type="Node2D" parent="."]
-position = Vector2(390, 165)
+[node name="Hero" type="CharacterBody2D" parent="."]
+position = Vector2(-300, -200)
 script = ExtResource("4_hero")
 
 [node name="Sprite2D" type="Sprite2D" parent="Hero"]
@@ -22,3 +24,8 @@ scale = Vector2(0.13, 0.13)
 texture = ExtResource("2_hero")
 region_enabled = true
 region_rect = Rect2(0, 0, 349, 584)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hero"]
+shape = SubResource("RectangleShape2D_hero")
+
+[node name="Camera2D" type="Camera2D" parent="Hero"]

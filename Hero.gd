@@ -1,4 +1,4 @@
-extends Node2D
+extends CharacterBody2D
 
 var current_waypoint := "Castle"
 var is_moving := false

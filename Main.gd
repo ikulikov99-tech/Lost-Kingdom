@@ -1,31 +1,32 @@
 extends Node2D
 
-const CLICK_RADIUS := 32.0
+const CLICK_RADIUS := 35.0
 const LABEL_FONT_SIZE := 14
 
+# Координаты в системе старой сцены (WorldMap center = (12, -53), scale = 1)
 var waypoints := {
 	"Castle": {
-		"pos": Vector2(390, 165),
+		"pos": Vector2(-300, -200),
 		"unlocked": true,
 		"adjacent": ["Village", "Mine"]
 	},
 	"Village": {
-		"pos": Vector2(640, 390),
+		"pos": Vector2(100, 20),
 		"unlocked": true,
 		"adjacent": ["Castle", "Ruins", "MageTower"]
 	},
 	"Mine": {
-		"pos": Vector2(310, 500),
+		"pos": Vector2(-400, 180),
 		"unlocked": true,
 		"adjacent": ["Castle"]
 	},
 	"Ruins": {
-		"pos": Vector2(800, 345),
+		"pos": Vector2(260, -100),
 		"unlocked": false,
 		"adjacent": ["Village", "MageTower"]
 	},
 	"MageTower": {
-		"pos": Vector2(975, 490),
+		"pos": Vector2(560, 170),
 		"unlocked": false,
 		"adjacent": ["Village", "Ruins"]
 	},
@@ -39,7 +40,7 @@ func _ready() -> void:
 func _draw() -> void:
 	var font := ThemeDB.fallback_font
 
-	# Draw roads between adjacent waypoints
+	# Дороги между соседними точками
 	var drawn: Array = []
 	for name in waypoints:
 		var wp = waypoints[name]
@@ -53,22 +54,20 @@ func _draw() -> void:
 			var road_color := Color(0.65, 0.42, 0.15, 0.9) if both_open else Color(0.35, 0.35, 0.35, 0.5)
 			draw_line(wp["pos"], waypoints[neighbor]["pos"], road_color, 4.0)
 
-	# Draw waypoint circles + labels
+	# Кружки и подписи точек
 	for name in waypoints:
 		var wp = waypoints[name]
 		var is_open: bool = wp["unlocked"]
 
-		# Circle fill
 		var fill := Color(0.18, 0.75, 0.28) if is_open else Color(0.30, 0.30, 0.30, 0.85)
-		draw_circle(wp["pos"], 16.0, fill)
+		draw_circle(wp["pos"], 18.0, fill)
 
-		# Circle border
 		var border := Color(1.0, 0.95, 0.6, 1.0) if is_open else Color(0.55, 0.55, 0.55, 0.8)
-		draw_arc(wp["pos"], 16.0, 0.0, TAU, 48, border, 2.5)
+		draw_arc(wp["pos"], 18.0, 0.0, TAU, 48, border, 2.5)
 
-		# Label background + text
+		# Подпись с тёмным фоном
 		var label_size := font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT_SIZE)
-		var label_pos := wp["pos"] + Vector2(-label_size.x * 0.5, -26.0)
+		var label_pos := wp["pos"] + Vector2(-label_size.x * 0.5, -28.0)
 		draw_rect(
 			Rect2(label_pos + Vector2(-4, -label_size.y - 2), label_size + Vector2(8, 6)),
 			Color(0.0, 0.0, 0.0, 0.72)
