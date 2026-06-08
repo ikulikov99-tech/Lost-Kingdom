@@ -54,26 +54,42 @@ func _draw() -> void:
 			var road_color := Color(0.65, 0.42, 0.15, 0.9) if both_open else Color(0.35, 0.35, 0.35, 0.5)
 			draw_line(wp["pos"], waypoints[neighbor]["pos"], road_color, 4.0)
 
-	# Кружки и подписи точек
+	# Маркеры точек (флажок-булавка)
 	for name in waypoints:
 		var wp = waypoints[name]
 		var is_open: bool = wp["unlocked"]
+		var p := wp["pos"]
 
-		var fill := Color(0.18, 0.75, 0.28) if is_open else Color(0.30, 0.30, 0.30, 0.85)
-		draw_circle(wp["pos"], 18.0, fill)
+		# Цвета: открытая = золотая, закрытая = тёмная
+		var pin_color := Color(0.95, 0.75, 0.1) if is_open else Color(0.25, 0.25, 0.25, 0.9)
+		var border_color := Color(1.0, 1.0, 1.0, 0.95) if is_open else Color(0.5, 0.5, 0.5, 0.8)
 
-		var border := Color(1.0, 0.95, 0.6, 1.0) if is_open else Color(0.55, 0.55, 0.55, 0.8)
-		draw_arc(wp["pos"], 18.0, 0.0, TAU, 48, border, 2.5)
+		# Тело пина: круг
+		draw_circle(p, 14.0, pin_color)
+		draw_arc(p, 14.0, 0.0, TAU, 32, border_color, 2.0)
 
-		# Подпись с тёмным фоном
-		var label_size := font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT_SIZE)
-		var label_pos := wp["pos"] + Vector2(-label_size.x * 0.5, -28.0)
-		draw_rect(
-			Rect2(label_pos + Vector2(-4, -label_size.y - 2), label_size + Vector2(8, 6)),
-			Color(0.0, 0.0, 0.0, 0.72)
-		)
-		var text_color := Color(1.0, 1.0, 0.85) if is_open else Color(0.6, 0.6, 0.6)
-		draw_string(font, label_pos, name, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_FONT_SIZE, text_color)
+		# Хвостик вниз
+		draw_line(p, p + Vector2(0, 20), border_color, 2.5)
+		draw_circle(p + Vector2(0, 22), 3.5, border_color)
+
+		# Подпись НАД маркером
+		var pad := 5
+		var fs := LABEL_FONT_SIZE
+		var label_w := font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var label_h := fs + 4
+		var lx := p.x - label_w * 0.5 - pad
+		var ly := p.y - 14 - label_h - 8
+
+		# Фон подписи
+		draw_rect(Rect2(lx, ly, label_w + pad * 2, label_h + 4),
+			Color(0.0, 0.0, 0.0, 0.78), true)
+		draw_rect(Rect2(lx, ly, label_w + pad * 2, label_h + 4),
+			border_color, false, 1.5)
+
+		# Текст
+		var text_col := Color(1.0, 1.0, 0.8) if is_open else Color(0.65, 0.65, 0.65)
+		draw_string(font, Vector2(lx + pad, ly + fs + 1),
+			name, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, text_col)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed):
