@@ -14,7 +14,7 @@ scale = Vector2(0.765, 0.765)
 texture = ExtResource("1_map")
 
 [node name="Hero" type="Node2D" parent="."]
-position = Vector2(220, 490)
+position = Vector2(390, 165)
 script = ExtResource("4_hero")
 
 [node name="Sprite2D" type="Sprite2D" parent="Hero"]
