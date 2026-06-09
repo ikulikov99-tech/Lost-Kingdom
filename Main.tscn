@@ -11,6 +11,7 @@ size = Vector2(28, 40)
 script = ExtResource("2_main")
 
 [node name="WorldMap" type="Sprite2D" parent="."]
+position = Vector2(-687, -547)
 texture = ExtResource("1_map")
 
 [node name="Hero" type="CharacterBody2D" parent="."]
@@ -27,10 +28,10 @@ shape = SubResource("RectangleShape2D_hero")
 [node name="Camera2D" type="Camera2D" parent="Hero"]
 enabled = true
 zoom = Vector2(0.76, 0.76)
-limit_left = -836
-limit_right = 836
-limit_top = -470
-limit_bottom = 470
+limit_left = -1523
+limit_right = -51
+limit_top = -1017
+limit_bottom = -77
 
 [node name="UI" type="CanvasLayer" parent="."]
 
