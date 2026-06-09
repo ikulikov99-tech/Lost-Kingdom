@@ -78,22 +78,9 @@ var unlocked: Dictionary     = {}   # id -> bool
 
 # ──────────────── Инициализация ──────────────────────────────────
 func _ready() -> void:
-	# Кривая Castle → Village с выраженными Bezier-касательными.
-	# Дорога: от ворот замка спускается на юг вдоль лестницы/реки,
-	# затем поворачивает на восток к деревне.
-	# out у Castle = вниз (юг), in у Village = слева (запад) → видимая дуга.
-	var cv := Curve2D.new()
-	cv.add_point(
-		Vector2(-1112, -704),   # Castle — ворота
-		Vector2(0, 0),
-		Vector2(0, 160)         # касательная: выходим строго на юг
-	)
-	cv.add_point(
-		Vector2(-928, -504),    # Village
-		Vector2(-160, 0),       # касательная: входим с запада
-		Vector2(0, 0)
-	)
-	_cv_path.curve = cv
+	# Кривая Castle<->Village загружается из Main.tscn (Curve2D_castle_village).
+	# Точки с Bezier-касательными: Castle выход на юг, Village вход с запада.
+	# Для редактирования: выдели CastleVillagePath в сцене и двигай точки мышью.
 
 	# Сброс состояния
 	current_location = "Castle"

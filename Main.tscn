@@ -1,50 +1,56 @@
-[gd_scene load_steps=8 format=3 uid="uid://bxkr3wyjwiun5"]
+[gd_scene format=3 uid="uid://bxkr3wyjwiun5"]
 
-[ext_resource type="Texture2D" path="res://maps/world_map.png" id="1_map"]
-[ext_resource type="Script"    path="res://Main.gd"            id="2_main"]
-[ext_resource type="Script"    path="res://Hero.gd"            id="3_hero"]
-[ext_resource type="Script"    path="res://FogOverlay.gd"      id="4_fog"]
+[ext_resource type="Texture2D" uid="uid://dr06sragmd1ub" path="res://maps/world_map.png" id="1_map"]
+[ext_resource type="Script" uid="uid://bbjafr1t2bajt" path="res://Main.gd" id="2_main"]
+[ext_resource type="Script" uid="uid://bre52ru3sknwq" path="res://Hero.gd" id="3_hero"]
+[ext_resource type="Script" uid="uid://dd6hmgvhhbf3l" path="res://FogOverlay.gd" id="4_fog"]
+
+[sub_resource type="Curve2D" id="Curve2D_castle_village"]
+point_count = 2
+point_0/position = Vector2(-1112, -704)
+point_0/in = Vector2(0, 0)
+point_0/out = Vector2(0, 160)
+point_1/position = Vector2(-928, -504)
+point_1/in = Vector2(-160, 0)
+point_1/out = Vector2(0, 0)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_hero"]
 size = Vector2(28, 40)
 
-[sub_resource type="Curve2D" id="Curve2D_castle_village"]
-
-[node name="Main" type="Node2D"]
+[node name="Main" type="Node2D" unique_id=160785485]
 script = ExtResource("2_main")
 
-[node name="WorldMap" type="Sprite2D" parent="."]
+[node name="WorldMap" type="Sprite2D" parent="." unique_id=1439782452]
 position = Vector2(-687, -547)
 texture = ExtResource("1_map")
 
-[node name="CastleVillagePath" type="Path2D" parent="."]
+[node name="CastleVillagePath" type="Path2D" parent="." unique_id=307424321]
 curve = SubResource("Curve2D_castle_village")
 
-[node name="HeroFollower" type="PathFollow2D" parent="CastleVillagePath"]
+[node name="HeroFollower" type="PathFollow2D" parent="CastleVillagePath" unique_id=1086056321]
 rotates = false
 
-[node name="Hero" type="CharacterBody2D" parent="."]
+[node name="Hero" type="CharacterBody2D" parent="." unique_id=253898775]
 position = Vector2(-1112, -704)
 script = ExtResource("3_hero")
 
-[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Hero"]
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Hero" unique_id=921539905]
 scale = Vector2(0.45, 0.45)
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Hero"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hero" unique_id=1555877070]
 position = Vector2(0, 16)
 shape = SubResource("RectangleShape2D_hero")
 
-[node name="Camera2D" type="Camera2D" parent="Hero"]
-enabled = true
+[node name="Camera2D" type="Camera2D" parent="Hero" unique_id=510778191]
 zoom = Vector2(1.3, 1.3)
 limit_left = -1523
-limit_right = 149
 limit_top = -1017
+limit_right = 149
 limit_bottom = -77
 
-[node name="UI" type="CanvasLayer" parent="."]
+[node name="UI" type="CanvasLayer" parent="." unique_id=1886279063]
 
-[node name="FogOverlay" type="ColorRect" parent="UI"]
+[node name="FogOverlay" type="ColorRect" parent="UI" unique_id=2074669519]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -53,35 +59,34 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("4_fog")
 
-[node name="StatusPanel" type="Panel" parent="UI"]
-anchors_preset = 0
+[node name="StatusPanel" type="Panel" parent="UI" unique_id=621191365]
 offset_left = 20.0
 offset_top = 20.0
 offset_right = 320.0
 offset_bottom = 80.0
 
-[node name="CurrentLabel" type="Label" parent="UI/StatusPanel"]
+[node name="CurrentLabel" type="Label" parent="UI/StatusPanel" unique_id=160657329]
+layout_mode = 0
 offset_left = 12.0
 offset_top = 8.0
 offset_right = 300.0
 offset_bottom = 34.0
 text = "Текущее: Королевский замок"
 
-[node name="UnlockedLabel" type="Label" parent="UI/StatusPanel"]
+[node name="UnlockedLabel" type="Label" parent="UI/StatusPanel" unique_id=1830604164]
+layout_mode = 0
 offset_left = 12.0
 offset_top = 40.0
 offset_right = 300.0
 offset_bottom = 66.0
 text = "Открыто: 2 / 9"
 
-[node name="TooltipLabel" type="Label" parent="UI"]
+[node name="TooltipLabel" type="Label" parent="UI" unique_id=262914846]
 visible = false
-offset_left = 0.0
-offset_top = 0.0
 offset_right = 200.0
 offset_bottom = 30.0
-theme_override_font_sizes/font_size = 14
 theme_override_colors/font_color = Color(1, 1, 0.6, 1)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
 theme_override_constants/shadow_offset_x = 2
 theme_override_constants/shadow_offset_y = 2
+theme_override_font_sizes/font_size = 14
