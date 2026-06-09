@@ -132,7 +132,7 @@ func _title(id: String) -> String:  return WAYPOINTS[id]["title"]
 func _screen_center_world() -> Vector2:
 	var vp_size := get_viewport().get_visible_rect().size
 	var ct      := get_viewport().get_canvas_transform()
-	return ct.affine_inverse().xform(vp_size * 0.5)
+	return ct.affine_inverse() * (vp_size * 0.5)
 
 func _push_camera_to_fog() -> void:
 	var vp_size := get_viewport().get_visible_rect().size
