@@ -9,9 +9,9 @@
 point_count = 2
 point_0/position = Vector2(-1112, -704)
 point_0/in = Vector2(0, 0)
-point_0/out = Vector2(0, 160)
+point_0/out = Vector2(60, 60)
 point_1/position = Vector2(-928, -504)
-point_1/in = Vector2(-160, 0)
+point_1/in = Vector2(-60, -60)
 point_1/out = Vector2(0, 0)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_hero"]
