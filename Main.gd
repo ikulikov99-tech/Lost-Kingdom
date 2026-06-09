@@ -110,11 +110,9 @@ func _pos(id: String)   -> Vector2: return WAYPOINTS[id]["pos"]
 func _title(id: String) -> String:  return WAYPOINTS[id]["title"]
 
 ## Точная позиция центра экрана в мировых координатах.
-## Использует обратное преобразование холста — корректно учитывает лимиты камеры.
+## camera.get_screen_center_position() учитывает zoom и limits Camera2D.
 func _screen_center_world() -> Vector2:
-	var vp_size := get_viewport().get_visible_rect().size
-	var ct      := get_viewport().get_canvas_transform()
-	return ct.affine_inverse() * (vp_size * 0.5)
+	return camera.get_screen_center_position()
 
 func _push_camera_to_fog() -> void:
 	var vp_size := get_viewport().get_visible_rect().size
@@ -130,8 +128,12 @@ func _input(event: InputEvent) -> void:
 		if clicked != "":
 			_try_move_to(clicked)
 
+func _physics_process(_delta: float) -> void:
+	# Камера двигается в physics_process — обновляем туман здесь же, без лага
+	_push_camera_to_fog()
+
 func _process(_delta: float) -> void:
-	# Обновляем позицию камеры в шейдере каждый кадр
+	# Резервное обновление тумана на случай кадров без physics_process
 	_push_camera_to_fog()
 
 	# Тултип
