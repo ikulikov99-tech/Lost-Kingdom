@@ -1,55 +1,40 @@
-## FogOverlay.gd — туман войны (без шейдера, через BLEND_MODE_MUL)
+## FogOverlay.gd — управление туманом войны
 ##
-## BLEND_MODE_MUL: пиксели FogOverlay умножаются на пиксели WorldMap.
-##   FOG_COLOR × карта  → тёмная карта (туман)
-##   WHITE     × карта  → видимая карта (открытая область)
-##
-## Вызывайте reveal(world_pos) при открытии новой локации.
+## Прикрепляется к ColorRect "FogOverlay" внутри CanvasLayer "UI".
+## ColorRect занимает весь экран и рисует шейдер тумана.
+## Шейдер сам конвертирует экранные координаты в мировые через позицию камеры.
 
-extends Node2D
+extends ColorRect
 
-const MAP_RECT  := Rect2(-1523, -1017, 1672, 940)
-const FOG_COLOR := Color(0.05, 0.05, 0.12, 1.0)   # тёмно-синий туман
-const REVEAL_R  := 300.0                            # радиус видимости
-const STEPS     := 20                               # шагов градиента
+const MAX_LOCS := 9
 
-var _mat: CanvasItemMaterial
+var _mat:      ShaderMaterial
 var _revealed: Array[Vector2] = []
 
 func _ready() -> void:
-	_mat = CanvasItemMaterial.new()
-	_mat.blend_mode = CanvasItemMaterial.BLEND_MODE_MUL
-	material = _mat
+	_mat        = ShaderMaterial.new()
+	_mat.shader = load("res://fog.gdshader")
+	material    = _mat
+	# Не блокировать клики
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sync_revealed()
 
-## Открыть область видимости вокруг мировой позиции pos
+## Открыть область вокруг мировой позиции pos
 func reveal(pos: Vector2) -> void:
 	for p in _revealed:
 		if p.distance_to(pos) < 20.0:
 			return
 	_revealed.append(pos)
-	queue_redraw()
+	_sync_revealed()
 
-func _draw() -> void:
-	# 1. Тёмный туман на весь прямоугольник карты
-	draw_rect(MAP_RECT, FOG_COLOR)
+## Обновить позицию камеры в шейдере (вызывать каждый кадр из Main._process)
+func update_camera(cam_pos: Vector2, zoom: float, vp_size: Vector2) -> void:
+	_mat.set_shader_parameter("cam_pos",  cam_pos)
+	_mat.set_shader_parameter("cam_zoom", zoom)
+	_mat.set_shader_parameter("vp_size",  vp_size)
 
-	# 2. Для каждой открытой точки — большой белый круг с мягким краем
-	for pos in _revealed:
-		_draw_reveal(pos)
-
-func _draw_reveal(center: Vector2) -> void:
-	# Белая зона занимает 70% радиуса, мягкий переход только в крайних 30%.
-	# Рисуем от большего (темнее) к меньшему (светлее), каждый круг перекрывает предыдущий.
-	var r_full := REVEAL_R               # граница тумана
-	var r_core := REVEAL_R * 0.70        # полностью белая зона
-
-	# Градиент на переходной полосе (от тумана к белому)
-	for i in range(STEPS + 1):
-		var t    := float(i) / float(STEPS)         # 0 = внешний край, 1 = граница core
-		var r    := lerpf(r_full, r_core, t)
-		var bright := t * t                          # ease-in: быстро светлеет к core
-		var col  := FOG_COLOR.lerp(Color.WHITE, bright)
-		draw_circle(center, r, col)
-
-	# Полностью белый core — видимая зона без тумана
-	draw_circle(center, r_core, Color.WHITE)
+func _sync_revealed() -> void:
+	_mat.set_shader_parameter("revealed_count", mini(_revealed.size(), MAX_LOCS))
+	for i in MAX_LOCS:
+		var p := _revealed[i] if i < _revealed.size() else Vector2(-99999, -99999)
+		_mat.set_shader_parameter("rp%d" % i, p)

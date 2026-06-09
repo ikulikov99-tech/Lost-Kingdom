@@ -2,21 +2,23 @@
 ##
 ## Отвечает за:
 ##  - отображение и клик по точкам карты
-##  - движение героя по дорогам через промежуточные точки
+##  - движение героя по дорогам (через Path2D или промежуточные точки)
 ##  - подсветку доступных локаций
-##  - туман войны через FogOverlay
+##  - туман войны через FogOverlay (ColorRect в UI CanvasLayer)
 ##  - синхронизацию с GameState
 
 extends Node2D
 
 # ──────────────── Ссылки на узлы ─────────────────────────────────
-@onready var hero: CharacterBody2D         = $Hero
-@onready var current_label: Label          = $UI/StatusPanel/CurrentLabel
-@onready var unlocked_label: Label         = $UI/StatusPanel/UnlockedLabel
-@onready var tooltip_label: Label          = $UI/TooltipLabel
+@onready var hero: CharacterBody2D  = $Hero
+@onready var camera: Camera2D       = $Hero/Camera2D
+@onready var current_label: Label   = $UI/StatusPanel/CurrentLabel
+@onready var unlocked_label: Label  = $UI/StatusPanel/UnlockedLabel
+@onready var tooltip_label: Label   = $UI/TooltipLabel
+@onready var fog_overlay: ColorRect = $UI/FogOverlay
 
-const FogOverlayClass = preload("res://FogOverlay.gd")
-var fog_overlay: Node2D   # создаётся в _ready()
+# Path2D для конкретных дорог (заполняются в _ready через get_node)
+var _path2d_castle_village: Path2D
 
 # ──────────────── Координаты (только из MAP_COORDINATES.md) ──────
 const WAYPOINTS := {
@@ -44,56 +46,42 @@ const ROUTES := {
 	"Mine":            ["Lumbermill", "EarthMageCastle"],
 }
 
-# ──────────────── Пути по дорогам ────────────────────────────────
-# Промежуточные точки маршрута (без старта и финиша).
-# Обратный путь строится автоматически через reverse().
-# Для точной корректировки: кликни по дороге в игре → увидишь CLICK world= в Output
-# → обнови координаты здесь.
+# ──────────────── Прямые промежуточные точки (для маршрутов без Path2D) ──
 const ROAD_PATHS := {
-	# Castle (-1112,-704) → Village (-928,-504): спуск от ворот по холму
-	"Castle->Village": [
-		Vector2(-1060, -640),
-		Vector2(-984,  -568),
-	],
-	# Village (-928,-504) → Dock (-1160,-128): вниз вдоль реки к пристани
 	"Village->Dock": [
 		Vector2(-1008, -400),
 		Vector2(-1080, -280),
 		Vector2(-1160, -192),
 	],
-	# Village (-928,-504) → KnightRuins (-648,-288): на восток через поля
 	"Village->KnightRuins": [
 		Vector2(-840,  -416),
 		Vector2(-744,  -352),
 	],
-	# Village (-928,-504) → Lumbermill (-640,-752): на северо-восток в лес
 	"Village->Lumbermill": [
 		Vector2(-832,  -608),
 		Vector2(-736,  -688),
 	],
-	# KnightRuins (-648,-288) → MageTower (-560,-320): короткий путь на восток
 	"KnightRuins->MageTower": [
 		Vector2(-604,  -304),
 	],
-	# KnightRuins (-648,-288) → EarthMageCastle (-464,-488): на юго-восток
 	"KnightRuins->EarthMageCastle": [
 		Vector2(-576,  -376),
 		Vector2(-512,  -440),
 	],
-	# EarthMageCastle (-464,-488) → DarkCastle (-376,-568): на восток
 	"EarthMageCastle->DarkCastle": [
 		Vector2(-420,  -528),
 	],
-	# EarthMageCastle (-464,-488) → Mine (-392,-832): на север через горы
 	"EarthMageCastle->Mine": [
 		Vector2(-440,  -640),
 		Vector2(-408,  -736),
 	],
-	# Lumbermill (-640,-752) → Mine (-392,-832): на восток
 	"Lumbermill->Mine": [
 		Vector2(-520,  -792),
 	],
 }
+
+# Количество точек при сэмплировании Path2D (больше = плавнее кривая)
+const PATH2D_SAMPLES := 20
 
 # ──────────────── Состояние игры ─────────────────────────────────
 var current_location: String = "Castle"
@@ -101,14 +89,10 @@ var unlocked: Dictionary = {}   # id -> bool
 
 # ──────────────── Инициализация ──────────────────────────────────
 func _ready() -> void:
-	# ── Туман войны (между WorldMap=0 и Hero=2) ───────────────────
-	fog_overlay = FogOverlayClass.new()
-	add_child(fog_overlay)
-	move_child(fog_overlay, 1)
+	# Получаем Path2D-узлы (созданы в сцене)
+	_path2d_castle_village = get_node_or_null("CastleVillagePath")
 
-	# ── Жёсткий сброс состояния на стартовое ─────────────────────
-	# Всегда начинаем с Castle, открыты только Castle и Village.
-	# Не читаем GameState — он мог сохранить данные прошлой сессии.
+	# ── Жёсткий сброс состояния ──────────────────────────────────
 	current_location = "Castle"
 	GameState.current_location = "Castle"
 	GameState.unlocked_locations = ["Castle", "Village"]
@@ -147,24 +131,30 @@ func _input(event: InputEvent) -> void:
 			_try_move_to(clicked)
 
 func _process(_delta: float) -> void:
-	# Обновляем подсказку при наведении мыши
+	# ── Обновляем туман: передаём актуальную позицию камеры ──────
+	var cam_pos := camera.get_screen_center_position()
+	fog_overlay.update_camera(
+		cam_pos,
+		camera.zoom.x,
+		get_viewport().get_visible_rect().size
+	)
+
+	# ── Тултип при наведении ──────────────────────────────────────
 	var mouse_pos := get_global_mouse_position()
 	var hovered := _find_any_waypoint(mouse_pos, 60.0)
 	if hovered != "":
 		tooltip_label.text = _title(hovered)
 		tooltip_label.visible = true
-		# Позиционируем тултип у курсора
 		var screen_pos := get_viewport().get_mouse_position()
 		tooltip_label.position = screen_pos + Vector2(12, -28)
 	else:
 		tooltip_label.visible = false
 
-	# Пульсация доступных точек — требует перерисовки каждый кадр
+	# ── Пульсация требует перерисовки каждый кадр ────────────────
 	if not hero.is_moving:
 		queue_redraw()
 
 # ──────────────── Поиск точки по клику ───────────────────────────
-## Возвращает ID доступной для перехода точки в радиусе radius
 func _find_accessible_waypoint(mouse_pos: Vector2, radius: float = 70.0) -> String:
 	var best := ""
 	var best_dist := radius
@@ -177,7 +167,6 @@ func _find_accessible_waypoint(mouse_pos: Vector2, radius: float = 70.0) -> Stri
 			best = id
 	return best
 
-## Возвращает ID любой открытой точки (для тултипа)
 func _find_any_waypoint(mouse_pos: Vector2, radius: float) -> String:
 	var best := ""
 	var best_dist := radius
@@ -203,35 +192,48 @@ func _is_accessible(id: String) -> bool:
 func _try_move_to(id: String) -> void:
 	if not _is_accessible(id):
 		return
-
-	# Заглушка для событий на пути — реализовать в следующем PR
 	on_route_event(current_location, id)
-
 	var path := _build_path(current_location, id)
 	hero.move_along_path(id, path)
 
-## Строим полный путь: старт + промежуточные точки + финиш
+## Строим полный путь: старт + кривая (Path2D или точки) + финиш
 func _build_path(from_id: String, to_id: String) -> Array[Vector2]:
 	var pts: Array[Vector2] = []
 	pts.append(_pos(from_id))
 
-	var key_fwd := from_id + "->" + to_id
-	var key_rev := to_id + "->" + from_id
-	if ROAD_PATHS.has(key_fwd):
-		for p: Vector2 in ROAD_PATHS[key_fwd]:
-			pts.append(p)
-	elif ROAD_PATHS.has(key_rev):
-		var rev: Array = ROAD_PATHS[key_rev].duplicate()
-		rev.reverse()
-		for p: Vector2 in rev:
-			pts.append(p)
+	# ── Маршруты с Path2D ────────────────────────────────────────
+	var path2d := _get_path2d(from_id, to_id)
+	if path2d != null:
+		var curve := path2d.curve
+		var length := curve.get_baked_length()
+		# Сэмплируем кривую равномерно
+		for i in range(1, PATH2D_SAMPLES):
+			var t := float(i) / float(PATH2D_SAMPLES)
+			pts.append(curve.sample_baked(t * length))
+	else:
+		# ── Промежуточные точки из ROAD_PATHS ────────────────────
+		var key_fwd := from_id + "->" + to_id
+		var key_rev := to_id + "->" + from_id
+		if ROAD_PATHS.has(key_fwd):
+			for p: Vector2 in ROAD_PATHS[key_fwd]:
+				pts.append(p)
+		elif ROAD_PATHS.has(key_rev):
+			var rev: Array = ROAD_PATHS[key_rev].duplicate()
+			rev.reverse()
+			for p: Vector2 in rev:
+				pts.append(p)
 
 	pts.append(_pos(to_id))
 	return pts
 
+## Возвращает Path2D для маршрута или null если не задан
+func _get_path2d(from_id: String, to_id: String) -> Path2D:
+	if (from_id == "Castle" and to_id == "Village") or \
+	   (from_id == "Village" and to_id == "Castle"):
+		return _path2d_castle_village
+	return null
+
 # ──────────────── Событие на пути (заглушка) ─────────────────────
-## TODO (следующий PR): случайное событие при переходе (бой, головоломка, предметы).
-## Сейчас всегда пропускается (chance = 0).
 func on_route_event(_from: String, _to: String) -> void:
 	pass
 
@@ -240,7 +242,6 @@ func _on_hero_arrived(location_name: String) -> void:
 	current_location = location_name
 	GameState.current_location = location_name
 
-	# Открываем соседние локации
 	for neighbor in ROUTES[location_name]:
 		if not (unlocked.get(neighbor, false) as bool):
 			unlocked[neighbor] = true
@@ -295,29 +296,25 @@ func _draw_waypoints() -> void:
 		var is_accessible: bool = _is_accessible(id)
 
 		if not open:
-			# Закрытая: маленький тусклый кружок (виден сквозь туман)
 			draw_circle(pos, 8.0, Color(0.3, 0.3, 0.3, 0.3))
 			continue
 
-		# ── Основной кружок ──────────────────────────────────────
 		var color: Color
 		if is_current:
-			color = Color(0.2, 0.55, 1.0, 1.0)       # синий — здесь
+			color = Color(0.2, 0.55, 1.0, 1.0)
 		elif is_accessible:
-			color = Color(0.15, 0.9, 0.25, 1.0)       # зелёный — можно идти
+			color = Color(0.15, 0.9, 0.25, 1.0)
 		else:
-			color = Color(0.7, 0.65, 0.3, 0.75)       # жёлтый — открыта, но не соединена
+			color = Color(0.7, 0.65, 0.3, 0.75)
 
 		draw_circle(pos, 20.0, color)
 		draw_arc(pos, 26.0, 0.0, TAU, 40, Color(1, 1, 1, 0.85), 2.5)
 
-		# ── Пульсирующая подсветка доступных ────────────────────
 		if is_accessible and not hero.is_moving:
 			var pulse := 0.5 + 0.5 * sin(t + pos.x * 0.01)
 			draw_arc(pos, 32.0 + pulse * 6.0, 0.0, TAU, 40,
 					 Color(0.3, 1.0, 0.4, 0.55 * pulse), 2.0)
 
-		# ── Название ─────────────────────────────────────────────
 		draw_string(ThemeDB.fallback_font,
 			pos + Vector2(-40, 40),
 			_title(id),

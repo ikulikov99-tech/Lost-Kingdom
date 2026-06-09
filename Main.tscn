@@ -1,11 +1,17 @@
-[gd_scene load_steps=5 format=3 uid="uid://bxkr3wyjwiun5"]
+[gd_scene load_steps=8 format=3 uid="uid://bxkr3wyjwiun5"]
 
 [ext_resource type="Texture2D" path="res://maps/world_map.png" id="1_map"]
-[ext_resource type="Script" path="res://Main.gd" id="2_main"]
-[ext_resource type="Script" path="res://Hero.gd" id="3_hero"]
+[ext_resource type="Script"    path="res://Main.gd"            id="2_main"]
+[ext_resource type="Script"    path="res://Hero.gd"            id="3_hero"]
+[ext_resource type="Script"    path="res://FogOverlay.gd"      id="4_fog"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_hero"]
 size = Vector2(28, 40)
+
+[sub_resource type="Curve2D" id="Curve2D_castle_village"]
+_data = {
+"points": PackedVector2Array(0, 0, 0, 0, -1112, -704, 0, 0, 0, 0, -1060, -640, 0, 0, 0, 0, -984, -576, 0, 0, 0, 0, -928, -504)
+}
 
 [node name="Main" type="Node2D"]
 script = ExtResource("2_main")
@@ -13,6 +19,9 @@ script = ExtResource("2_main")
 [node name="WorldMap" type="Sprite2D" parent="."]
 position = Vector2(-687, -547)
 texture = ExtResource("1_map")
+
+[node name="CastleVillagePath" type="Path2D" parent="."]
+curve = SubResource("Curve2D_castle_village")
 
 [node name="Hero" type="CharacterBody2D" parent="."]
 position = Vector2(-1112, -704)
@@ -34,6 +43,15 @@ limit_top = -1017
 limit_bottom = -77
 
 [node name="UI" type="CanvasLayer" parent="."]
+
+[node name="FogOverlay" type="ColorRect" parent="UI"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_fog")
 
 [node name="StatusPanel" type="Panel" parent="UI"]
 anchors_preset = 0

@@ -1,40 +1,53 @@
-// fog.gdshader — туман войны для Lost Kingdom
-// Покрывает карту тёмным туманом, оставляя круги видимости вокруг открытых локаций.
+// fog.gdshader — туман войны (полноэкранный шейдер в CanvasLayer)
+//
+// Работает в экранном пространстве.
+// Конвертирует UV экрана → мировые координаты через позицию камеры.
+// Рисует серые полупрозрачные "облака" там, где карта не открыта.
 
 shader_type canvas_item;
 
-const int MAX_LOCS = 9;
+// Позиция центра камеры в мировых координатах (обновляется каждый кадр)
+uniform vec2  cam_pos    = vec2(-1112.0, -704.0);
+uniform float cam_zoom   = 1.3;
+uniform vec2  vp_size    = vec2(1280.0, 720.0);
 
-// Количество открытых локаций
-uniform int revealed_count = 0;
+// Открытые позиции (до 9 штук, по одной uniform на каждую)
+uniform int   revealed_count = 0;
+uniform vec2  rp0 = vec2(-99999.0, -99999.0);
+uniform vec2  rp1 = vec2(-99999.0, -99999.0);
+uniform vec2  rp2 = vec2(-99999.0, -99999.0);
+uniform vec2  rp3 = vec2(-99999.0, -99999.0);
+uniform vec2  rp4 = vec2(-99999.0, -99999.0);
+uniform vec2  rp5 = vec2(-99999.0, -99999.0);
+uniform vec2  rp6 = vec2(-99999.0, -99999.0);
+uniform vec2  rp7 = vec2(-99999.0, -99999.0);
+uniform vec2  rp8 = vec2(-99999.0, -99999.0);
 
-// Позиции открытых локаций в мировых координатах (x0,y0, x1,y1, ...)
-uniform float revealed_xy[18];
+// Радиус видимости и мягкость края
+uniform float reveal_r    = 320.0;
+uniform float edge_soft   = 80.0;
 
-// Радиус видимости вокруг каждой открытой локации
-uniform float reveal_radius = 270.0;
-// Мягкость края тумана
-uniform float edge_soft = 80.0;
-// Цвет тумана
-uniform vec4 fog_color : source_color = vec4(0.02, 0.02, 0.08, 0.88);
-
-// Передаём мировую позицию вершины в фрагментный шейдер
-varying vec2 world_pos;
-
-void vertex() {
-	// VERTEX — позиция в локальном пространстве узла (= мировое, т.к. FogOverlay в (0,0))
-	world_pos = VERTEX;
-}
+// Цвет тумана: серые облака с высокой прозрачностью в открытых зонах
+uniform vec4 fog_color : source_color = vec4(0.10, 0.12, 0.18, 0.88);
 
 void fragment() {
-	float min_dist = 1e9;
-	for (int i = 0; i < revealed_count && i < MAX_LOCS; i++) {
-		float px = revealed_xy[i * 2];
-		float py = revealed_xy[i * 2 + 1];
-		float d = distance(world_pos, vec2(px, py));
-		min_dist = min(min_dist, d);
-	}
-	// smoothstep: 0 = полностью видно, 1 = полный туман
-	float fog = smoothstep(reveal_radius - edge_soft, reveal_radius + edge_soft, min_dist);
-	COLOR = vec4(fog_color.rgb, fog_color.a * fog);
+	// SCREEN_UV: (0,0)=верхний левый, (1,1)=нижний правый
+	vec2 screen_px  = (SCREEN_UV - vec2(0.5)) * vp_size;   // пиксели от центра экрана
+	vec2 world_pos  = cam_pos + screen_px / cam_zoom;       // мировые координаты
+
+	// Расстояние до ближайшей открытой локации
+	float min_d = 1e9;
+	if (revealed_count > 0) min_d = min(min_d, distance(world_pos, rp0));
+	if (revealed_count > 1) min_d = min(min_d, distance(world_pos, rp1));
+	if (revealed_count > 2) min_d = min(min_d, distance(world_pos, rp2));
+	if (revealed_count > 3) min_d = min(min_d, distance(world_pos, rp3));
+	if (revealed_count > 4) min_d = min(min_d, distance(world_pos, rp4));
+	if (revealed_count > 5) min_d = min(min_d, distance(world_pos, rp5));
+	if (revealed_count > 6) min_d = min(min_d, distance(world_pos, rp6));
+	if (revealed_count > 7) min_d = min(min_d, distance(world_pos, rp7));
+	if (revealed_count > 8) min_d = min(min_d, distance(world_pos, rp8));
+
+	// fog_alpha: 0 = открыто (прозрачно), 1 = туман (непрозрачно)
+	float fog_alpha = smoothstep(reveal_r - edge_soft, reveal_r + edge_soft, min_d);
+	COLOR = vec4(fog_color.rgb, fog_color.a * fog_alpha);
 }
