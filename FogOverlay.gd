@@ -33,16 +33,23 @@ func _draw() -> void:
 	# 1. Тёмный туман на весь прямоугольник карты
 	draw_rect(MAP_RECT, FOG_COLOR)
 
-	# 2. Для каждой открытой точки — градиентный круг (от тёмного края к белому центру)
+	# 2. Для каждой открытой точки — большой белый круг с мягким краем
 	for pos in _revealed:
 		_draw_reveal(pos)
 
 func _draw_reveal(center: Vector2) -> void:
-	# Рисуем от внешнего (тёмного) к внутреннему (белому).
-	# Каждый следующий круг меньше и светлее — перекрывает предыдущий в центре.
+	# Белая зона занимает 70% радиуса, мягкий переход только в крайних 30%.
+	# Рисуем от большего (темнее) к меньшему (светлее), каждый круг перекрывает предыдущий.
+	var r_full := REVEAL_R               # граница тумана
+	var r_core := REVEAL_R * 0.70        # полностью белая зона
+
+	# Градиент на переходной полосе (от тумана к белому)
 	for i in range(STEPS + 1):
-		var t    := float(i) / float(STEPS)  # 0 = край, 1 = центр
-		var r    := REVEAL_R * (1.0 - t)
-		var bright := t * t                  # плавный ease-in
+		var t    := float(i) / float(STEPS)         # 0 = внешний край, 1 = граница core
+		var r    := lerpf(r_full, r_core, t)
+		var bright := t * t                          # ease-in: быстро светлеет к core
 		var col  := FOG_COLOR.lerp(Color.WHITE, bright)
 		draw_circle(center, r, col)
+
+	# Полностью белый core — видимая зона без тумана
+	draw_circle(center, r_core, Color.WHITE)
