@@ -5,28 +5,37 @@ extends Node2D
 @onready var unlocked_label: Label = $UI/StatusPanel/UnlockedLabel
 
 const WAYPOINTS := {
-	"Castle":    Vector2(-1213, -758),
-	"Village":   Vector2(-1049, -521),
-	"Mine":      Vector2(-654, -797),
-	"Ruins":     Vector2(-917, -389),
-	"MageTower": Vector2(-654, -231),
+	"Castle":     Vector2(-1256, -712),
+	"Village":    Vector2(-1056, -512),
+	"Mine":       Vector2(-824,  -768),
+	"Ruins":      Vector2(-800,  -368),
+	"Dock":       Vector2(-1352, -192),
+	"MageTower":  Vector2(-776,  -312),
+	"DarkCastle": Vector2(-672,  -544),
+	"Catacombs":  Vector2(-608,  -808),
 }
 
 const ROUTES := {
-	"Castle": ["Village"],
-	"Village": ["Castle", "Mine", "Ruins"],
-	"Mine": ["Village"],
-	"Ruins": ["Village", "MageTower"],
-	"MageTower": ["Ruins"],
+	"Castle":     ["Village", "Mine"],
+	"Village":    ["Castle", "Ruins", "Dock"],
+	"Mine":       ["Castle", "Catacombs"],
+	"Ruins":      ["Village", "MageTower"],
+	"Dock":       ["Village"],
+	"MageTower":  ["Ruins", "DarkCastle"],
+	"DarkCastle": ["MageTower", "Catacombs"],
+	"Catacombs":  ["Mine", "DarkCastle"],
 }
 
 var current_location := "Castle"
 var unlocked := {
-	"Castle": true,
-	"Village": true,
-	"Mine": false,
-	"Ruins": false,
-	"MageTower": false,
+	"Castle":     true,
+	"Village":    true,
+	"Mine":       false,
+	"Ruins":      false,
+	"Dock":       false,
+	"MageTower":  false,
+	"DarkCastle": false,
+	"Catacombs":  false,
 }
 
 func _ready() -> void:
