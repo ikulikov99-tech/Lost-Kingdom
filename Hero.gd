@@ -1,19 +1,27 @@
 ## Hero.gd — герой на глобальной карте
 ##
-## Поддерживает движение по пути через массив промежуточных точек.
-## Сигнал arrived(location_name) отправляется при прибытии в конечную точку.
+## Два режима движения:
+##  1. follow_path2d()  — движение вдоль PathFollow2D (Castle<->Village)
+##  2. move_along_path() — движение через массив точек (остальные маршруты)
 
 extends CharacterBody2D
 
 signal arrived(location_name: String)
 
-@export var walk_speed: float = 200.0
+@export var walk_speed: float = 150.0
 
-# Путь (массив мировых координат включая старт и финиш)
+# ── Режим PathFollow2D ────────────────────────────────────────────
+var _pf_node:   PathFollow2D = null
+var _pf_length: float        = 0.0
+var _pf_forward: bool        = true   # true = от start к end, false = обратно
+
+# ── Режим массива точек ───────────────────────────────────────────
 var path: Array[Vector2] = []
-var path_index: int = 0
+var path_index: int      = 0
+
+# ── Общее ────────────────────────────────────────────────────────
 var target_location: String = "Castle"
-var is_moving: bool = false
+var is_moving: bool         = false
 
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
 
@@ -21,51 +29,84 @@ func _ready() -> void:
 	_setup_hero_animation()
 	animated_sprite.play("idle")
 
-func _physics_process(_delta: float) -> void:
+# ──────────────────────────────────────────────────────────────────
+func _physics_process(delta: float) -> void:
 	if not is_moving:
 		return
 
+	# ── Режим PathFollow2D ────────────────────────────────────────
+	if _pf_node != null:
+		var prev_pos := global_position
+		if _pf_forward:
+			_pf_node.progress += walk_speed * delta
+		else:
+			_pf_node.progress -= walk_speed * delta
+
+		var new_pos := _pf_node.global_position
+		_set_visual_direction(new_pos - prev_pos)
+		global_position = new_pos
+
+		var done := (_pf_forward  and _pf_node.progress_ratio >= 1.0) or \
+					(not _pf_forward and _pf_node.progress <= 0.0)
+		if done:
+			_pf_node.progress_ratio = 1.0 if _pf_forward else 0.0
+			global_position = _pf_node.global_position
+			_finish_move()
+		return
+
+	# ── Режим массива точек ───────────────────────────────────────
 	var target := path[path_index]
 	var direction := target - global_position
 
 	if direction.length() <= 3.0:
 		global_position = target
 		path_index += 1
-
 		if path_index >= path.size():
-			# Конец пути — прибыли
-			velocity = Vector2.ZERO
-			is_moving = false
-			animated_sprite.play("idle")
-			emit_signal("arrived", target_location)
-		# Иначе двигаемся к следующей точке (на следующем кадре)
+			_finish_move()
 		return
 
 	velocity = direction.normalized() * walk_speed
 	_set_visual_direction(direction)
 	move_and_slide()
 
-## Начать движение по массиву точек.
-## points должен включать стартовую и конечную позицию.
-func move_along_path(location_name: String, points: Array[Vector2]) -> void:
-	if points.size() < 2:
-		push_warning("Hero.move_along_path: path has fewer than 2 points")
-		emit_signal("arrived", location_name)
-		return
+func _finish_move() -> void:
+	velocity     = Vector2.ZERO
+	is_moving    = false
+	_pf_node     = null
+	animated_sprite.play("idle")
+	emit_signal("arrived", target_location)
 
-	target_location = location_name
-	path = points
-	path_index = 1          # 0 — текущая позиция, начинаем со следующей
-	is_moving = true
+# ──────────────────────────────────────────────────────────────────
+## Движение по PathFollow2D.
+## pf      — PathFollow2D (дочерний узел Path2D)
+## length  — длина кривой (curve.get_baked_length())
+## forward — true: от начала кривой к концу; false: в обратную сторону
+func follow_path2d(loc_name: String, pf: PathFollow2D,
+				   length: float, forward: bool) -> void:
+	target_location = loc_name
+	_pf_node        = pf
+	_pf_length      = length
+	_pf_forward     = forward
+	# Ставим PathFollow2D в начало или конец в зависимости от направления
+	pf.progress_ratio = 0.0 if forward else 1.0
+	global_position   = pf.global_position
+	is_moving         = true
 	animated_sprite.play("walk")
 
-## Устаревший метод — оставлен для совместимости.
-## Предпочтительно использовать move_along_path.
-func move_to(location_name: String, point: Vector2) -> void:
-	var pts: Array[Vector2] = [global_position, point]
-	move_along_path(location_name, pts)
+## Движение по массиву мировых точек (legacy).
+func move_along_path(loc_name: String, points: Array[Vector2]) -> void:
+	if points.size() < 2:
+		push_warning("Hero.move_along_path: менее 2 точек")
+		emit_signal("arrived", loc_name)
+		return
+	target_location = loc_name
+	path            = points
+	path_index      = 1
+	_pf_node        = null
+	is_moving       = true
+	animated_sprite.play("walk")
 
-# ──────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────
 func _setup_hero_animation() -> void:
 	var folder := "res://characters/female_map"
 	if GameState.selected_hero == "male":
@@ -73,14 +114,11 @@ func _setup_hero_animation() -> void:
 
 	var frames := SpriteFrames.new()
 
-	# idle: один кадр
 	frames.add_animation("idle")
 	frames.set_animation_loop("idle", true)
 	frames.set_animation_speed("idle", 2.0)
 	frames.add_frame("idle", load(folder + "/frame_1.png"))
 
-	# walk: 4 кадра
-	# TODO: заменить на 8-direction top-down спрайт-лист
 	frames.add_animation("walk")
 	frames.set_animation_loop("walk", true)
 	frames.set_animation_speed("walk", 8.0)
@@ -89,5 +127,6 @@ func _setup_hero_animation() -> void:
 
 	animated_sprite.sprite_frames = frames
 
-func _set_visual_direction(direction: Vector2) -> void:
-	animated_sprite.flip_h = direction.x < 0.0
+func _set_visual_direction(dir: Vector2) -> void:
+	if dir.length() > 0.1:
+		animated_sprite.flip_h = dir.x < 0.0

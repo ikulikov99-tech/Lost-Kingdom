@@ -20,6 +20,9 @@ texture = ExtResource("1_map")
 [node name="CastleVillagePath" type="Path2D" parent="."]
 curve = SubResource("Curve2D_castle_village")
 
+[node name="HeroFollower" type="PathFollow2D" parent="CastleVillagePath"]
+rotates = false
+
 [node name="Hero" type="CharacterBody2D" parent="."]
 position = Vector2(-1112, -704)
 script = ExtResource("3_hero")
