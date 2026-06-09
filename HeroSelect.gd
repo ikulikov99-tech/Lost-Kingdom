@@ -148,7 +148,7 @@ func _make_card(hero_id: String, img_path: String, name_text: String,
 	ldesc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	ldesc.add_theme_font_size_override("font_size", 10)
 	ldesc.add_theme_color_override("font_color", Color(0.27, 0.43, 0.55))
-	ldesc.autowrap_mode = TextServer.AUTOWRAP_WORD_ARBITRARY
+	ldesc.autowrap_mode = 3  # AUTOWRAP_WORD_ARBITRARY
 	ldesc.custom_minimum_size = Vector2(160, 0)
 	ldesc.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	vbox.add_child(ldesc)
