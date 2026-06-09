@@ -10,9 +10,8 @@ extends Node2D
 @onready var tooltip_label: Label   = $UI/TooltipLabel
 @onready var fog_overlay: ColorRect = $UI/FogOverlay
 
-# Path2D для Castle<->Village
-@onready var _cv_path: Path2D       = $CastleVillagePath
-@onready var _cv_follow: PathFollow2D = $CastleVillagePath/HeroFollower
+# Path2D для Castle<->Village (HeroFollower не используется в runtime)
+@onready var _cv_path: Path2D = $CastleVillagePath
 
 # ──────────────── Координаты ─────────────────────────────────────
 const WAYPOINTS := {
@@ -79,23 +78,19 @@ var unlocked: Dictionary     = {}   # id -> bool
 
 # ──────────────── Инициализация ──────────────────────────────────
 func _ready() -> void:
-	# Строим кривую Castle<->Village программно с Безье-касательными.
-	# Дорога идёт на юго-восток, огибая замок и реку.
-	# Касательные задают плавный изгиб — не прямую линию.
+	# Кривая Castle → Village с выраженными Bezier-касательными.
+	# Дорога: от ворот замка спускается на юг вдоль лестницы/реки,
+	# затем поворачивает на восток к деревне.
+	# out у Castle = вниз (юг), in у Village = слева (запад) → видимая дуга.
 	var cv := Curve2D.new()
 	cv.add_point(
-		Vector2(-1112, -704),                   # Castle
-		Vector2(0, 0),                          # in (не используется у первой точки)
-		Vector2(80, 40)                         # out → кривая уходит на восток-юг
+		Vector2(-1112, -704),   # Castle — ворота
+		Vector2(0, 0),
+		Vector2(0, 160)         # касательная: выходим строго на юг
 	)
 	cv.add_point(
-		Vector2(-1020, -580),                   # промежуток: поворот у реки
-		Vector2(-80, -40),
-		Vector2(80, 40)
-	)
-	cv.add_point(
-		Vector2(-928, -504),                    # Village
-		Vector2(-80, -40),                      # in → приходим с запада-севера
+		Vector2(-928, -504),    # Village
+		Vector2(-160, 0),       # касательная: входим с запада
 		Vector2(0, 0)
 	)
 	_cv_path.curve = cv
@@ -192,15 +187,14 @@ func _try_move_to(id: String) -> void:
 	if not _is_accessible(id): return
 	on_route_event(current_location, id)
 
-	# Castle <-> Village — движение по Path2D
+	# Castle <-> Village — сэмплируем Bezier-кривую
 	if (current_location == "Castle" and id == "Village") or \
 	   (current_location == "Village" and id == "Castle"):
-		var forward := (current_location == "Castle")
-		hero.follow_path2d(id, _cv_follow,
-						   _cv_path.curve.get_baked_length(), forward)
+		var pts := _sample_cv_path(current_location == "Castle")
+		hero.move_along_path(id, pts)
 		return
 
-	# Остальные маршруты — массив точек
+	# Остальные маршруты — промежуточные точки
 	hero.move_along_path(id, _build_waypoint_path(current_location, id))
 
 ## Путь через промежуточные точки (не Path2D маршруты)
@@ -215,6 +209,21 @@ func _build_waypoint_path(from_id: String, to_id: String) -> Array[Vector2]:
 		rev.reverse()
 		for p: Vector2 in rev: pts.append(p)
 	pts.append(_pos(to_id))
+	return pts
+
+## Возвращает точки кривой Castle<->Village из Bezier-сэмплирования.
+## forward=true: Castle→Village, false: Village→Castle
+func _sample_cv_path(forward: bool) -> Array[Vector2]:
+	var pts: Array[Vector2] = []
+	var baked := _cv_path.curve.get_baked_points()  # PackedVector2Array
+	if forward:
+		for p in baked:
+			pts.append(p)
+	else:
+		var i := baked.size() - 1
+		while i >= 0:
+			pts.append(baked[i])
+			i -= 1
 	return pts
 
 func on_route_event(_from: String, _to: String) -> void:
