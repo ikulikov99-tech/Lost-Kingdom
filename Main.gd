@@ -199,18 +199,24 @@ func _build_waypoint_path(from_id: String, to_id: String) -> Array[Vector2]:
 	return pts
 
 ## Возвращает точки кривой Castle<->Village из Bezier-сэмплирования.
+## Первая и последняя точки — точные координаты вейпоинтов (не из кривой).
 ## forward=true: Castle→Village, false: Village→Castle
 func _sample_cv_path(forward: bool) -> Array[Vector2]:
 	var pts: Array[Vector2] = []
 	var baked := _cv_path.curve.get_baked_points()  # PackedVector2Array
+
 	if forward:
-		for p in baked:
-			pts.append(p)
+		pts.append(_pos("Castle"))          # точный старт
+		for i in range(1, baked.size() - 1):
+			pts.append(baked[i])
+		pts.append(_pos("Village"))         # точный финиш
 	else:
-		var i := baked.size() - 1
-		while i >= 0:
+		pts.append(_pos("Village"))         # точный старт (обратно)
+		var i := baked.size() - 2
+		while i > 0:
 			pts.append(baked[i])
 			i -= 1
+		pts.append(_pos("Castle"))          # точный финиш
 	return pts
 
 func on_route_event(_from: String, _to: String) -> void:
