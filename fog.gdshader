@@ -24,8 +24,8 @@ uniform vec2  rp7 = vec2(-99999.0, -99999.0);
 uniform vec2  rp8 = vec2(-99999.0, -99999.0);
 
 // Радиус видимости и мягкость края
-uniform float reveal_r    = 320.0;
-uniform float edge_soft   = 80.0;
+uniform float reveal_r    = 160.0;
+uniform float edge_soft   = 40.0;
 
 // Цвет тумана: серые облака с высокой прозрачностью в открытых зонах
 uniform vec4 fog_color : source_color = vec4(0.10, 0.12, 0.18, 0.88);

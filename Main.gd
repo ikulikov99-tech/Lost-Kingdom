@@ -89,8 +89,15 @@ var unlocked: Dictionary = {}   # id -> bool
 
 # ──────────────── Инициализация ──────────────────────────────────
 func _ready() -> void:
-	# Получаем Path2D-узлы (созданы в сцене)
+	# Получаем Path2D-узлы и заполняем кривые программно
 	_path2d_castle_village = get_node_or_null("CastleVillagePath")
+	if _path2d_castle_village != null:
+		var cv := Curve2D.new()
+		cv.add_point(Vector2(-1112, -704))   # Castle
+		cv.add_point(Vector2(-1060, -640))
+		cv.add_point(Vector2(-984,  -576))
+		cv.add_point(Vector2(-928,  -504))   # Village
+		_path2d_castle_village.curve = cv
 
 	# ── Жёсткий сброс состояния ──────────────────────────────────
 	current_location = "Castle"
