@@ -1,14 +1,21 @@
 # MAP_COORDINATES.md — Lost Kingdom
 
-These coordinates are used by `Main.gd`.
-If you change a waypoint in Godot, update this file and `Main.gd`.
+Координаты измерены в редакторе Godot.
+Если двигаешь точку — обнови этот файл и `Main.gd`.
 
-| Location | X | Y |
-|---|---:|---:|
-| Castle | -360 | -160 |
-| Village | -230 | 105 |
-| Mine | 230 | -210 |
-| Ruins | 65 | 175 |
-| MageTower | 260 | 300 |
+| Локация    |    X |    Y | Описание           |
+|------------|-----:|-----:|--------------------|
+| Castle     | -851 |   10 | Ворота замка       |
+| Village    | -682 | -341 | Деревня            |
+| Mine       | -409 | -572 | Шахта              |
+| Ruins      | -419 | -214 | Развалины          |
+| MageTower  | -366 | -115 | Башня мага         |
 
-Important: do not guess coordinates. Use Godot editor positions.
+## Маршруты
+- Castle → Village
+- Village → Castle, Mine, Ruins
+- Mine → Village
+- Ruins → Village, MageTower
+- MageTower → Ruins
+
+Не угадывать координаты. Только из редактора Godot.
