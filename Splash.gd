@@ -27,7 +27,7 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	for s in stars:
-		var a := s["alpha"] * (0.5 + 0.5 * sin(s["t"]))
+		var a: float = float(s["alpha"]) * (0.5 + 0.5 * sin(float(s["t"])))
 		var col := Color(0.78, 0.93, 0.72, a)
 		draw_circle(Vector2(s["x"], s["y"]), s["r"], col)
 
