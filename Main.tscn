@@ -15,7 +15,7 @@ position = Vector2(-687, -547)
 texture = ExtResource("1_map")
 
 [node name="Hero" type="CharacterBody2D" parent="."]
-position = Vector2(-1256, -712)
+position = Vector2(-1112, -704)
 script = ExtResource("3_hero")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Hero"]
@@ -27,9 +27,9 @@ shape = SubResource("RectangleShape2D_hero")
 
 [node name="Camera2D" type="Camera2D" parent="Hero"]
 enabled = true
-zoom = Vector2(0.76, 0.76)
+zoom = Vector2(1.3, 1.3)
 limit_left = -1523
-limit_right = -51
+limit_right = 149
 limit_top = -1017
 limit_bottom = -77
 
@@ -39,19 +39,31 @@ limit_bottom = -77
 anchors_preset = 0
 offset_left = 20.0
 offset_top = 20.0
-offset_right = 420.0
-offset_bottom = 105.0
+offset_right = 320.0
+offset_bottom = 80.0
 
 [node name="CurrentLabel" type="Label" parent="UI/StatusPanel"]
 offset_left = 12.0
-offset_top = 10.0
-offset_right = 380.0
-offset_bottom = 36.0
-text = "Current: Castle"
+offset_top = 8.0
+offset_right = 300.0
+offset_bottom = 34.0
+text = "Текущее: Королевский замок"
 
 [node name="UnlockedLabel" type="Label" parent="UI/StatusPanel"]
 offset_left = 12.0
-offset_top = 45.0
-offset_right = 380.0
-offset_bottom = 70.0
-text = "Unlocked: Castle, Village"
+offset_top = 40.0
+offset_right = 300.0
+offset_bottom = 66.0
+text = "Открыто: 2 / 9"
+
+[node name="TooltipLabel" type="Label" parent="UI"]
+visible = false
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 200.0
+offset_bottom = 30.0
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(1, 1, 0.6, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.9)
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 2
