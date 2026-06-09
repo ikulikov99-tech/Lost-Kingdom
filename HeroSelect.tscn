@@ -10,35 +10,3 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_select")
-
-[node name="Panel" type="Panel" parent="."]
-layout_mode = 0
-offset_left = 330.0
-offset_top = 130.0
-offset_right = 830.0
-offset_bottom = 430.0
-
-[node name="Title" type="Label" parent="Panel"]
-layout_mode = 0
-offset_left = 60.0
-offset_top = 40.0
-offset_right = 450.0
-offset_bottom = 90.0
-text = "Выбери героя"
-horizontal_alignment = 1
-
-[node name="MaleButton" type="Button" parent="Panel"]
-layout_mode = 0
-offset_left = 90.0
-offset_top = 130.0
-offset_right = 410.0
-offset_bottom = 180.0
-text = "Рыцарь"
-
-[node name="FemaleButton" type="Button" parent="Panel"]
-layout_mode = 0
-offset_left = 90.0
-offset_top = 200.0
-offset_right = 410.0
-offset_bottom = 250.0
-text = "Воительница"
