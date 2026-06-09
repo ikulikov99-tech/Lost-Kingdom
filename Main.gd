@@ -45,21 +45,54 @@ const ROUTES := {
 }
 
 # ──────────────── Пути по дорогам ────────────────────────────────
-# Промежуточные точки между локациями (без старта и финиша).
-# Порядок: от первого ID ко второму. Обратный маршрут применяет reverse().
-# TODO: уточнить промежуточные точки по фактическим дорогам на карте.
-# Для уточнения: кликни на дорогу в игре, запиши координаты в MAP_COORDINATES.md
-# и добавь их сюда.
+# Промежуточные точки маршрута (без старта и финиша).
+# Обратный путь строится автоматически через reverse().
+# Для точной корректировки: кликни по дороге в игре → увидишь CLICK world= в Output
+# → обнови координаты здесь.
 const ROAD_PATHS := {
-	"Castle->Village":              [],
-	"Village->Dock":                [],
-	"Village->KnightRuins":         [],
-	"Village->Lumbermill":          [],
-	"KnightRuins->MageTower":       [],
-	"KnightRuins->EarthMageCastle": [],
-	"EarthMageCastle->DarkCastle":  [],
-	"EarthMageCastle->Mine":        [],
-	"Lumbermill->Mine":             [],
+	# Castle (-1112,-704) → Village (-928,-504): спуск от ворот по холму
+	"Castle->Village": [
+		Vector2(-1060, -640),
+		Vector2(-984,  -568),
+	],
+	# Village (-928,-504) → Dock (-1160,-128): вниз вдоль реки к пристани
+	"Village->Dock": [
+		Vector2(-1008, -400),
+		Vector2(-1080, -280),
+		Vector2(-1160, -192),
+	],
+	# Village (-928,-504) → KnightRuins (-648,-288): на восток через поля
+	"Village->KnightRuins": [
+		Vector2(-840,  -416),
+		Vector2(-744,  -352),
+	],
+	# Village (-928,-504) → Lumbermill (-640,-752): на северо-восток в лес
+	"Village->Lumbermill": [
+		Vector2(-832,  -608),
+		Vector2(-736,  -688),
+	],
+	# KnightRuins (-648,-288) → MageTower (-560,-320): короткий путь на восток
+	"KnightRuins->MageTower": [
+		Vector2(-604,  -304),
+	],
+	# KnightRuins (-648,-288) → EarthMageCastle (-464,-488): на юго-восток
+	"KnightRuins->EarthMageCastle": [
+		Vector2(-576,  -376),
+		Vector2(-512,  -440),
+	],
+	# EarthMageCastle (-464,-488) → DarkCastle (-376,-568): на восток
+	"EarthMageCastle->DarkCastle": [
+		Vector2(-420,  -528),
+	],
+	# EarthMageCastle (-464,-488) → Mine (-392,-832): на север через горы
+	"EarthMageCastle->Mine": [
+		Vector2(-440,  -640),
+		Vector2(-408,  -736),
+	],
+	# Lumbermill (-640,-752) → Mine (-392,-832): на восток
+	"Lumbermill->Mine": [
+		Vector2(-520,  -792),
+	],
 }
 
 # ──────────────── Состояние игры ─────────────────────────────────
@@ -68,23 +101,28 @@ var unlocked: Dictionary = {}   # id -> bool
 
 # ──────────────── Инициализация ──────────────────────────────────
 func _ready() -> void:
-	# Создаём туман войны программно (между WorldMap и Hero)
+	# ── Туман войны (между WorldMap=0 и Hero=2) ───────────────────
 	fog_overlay = FogOverlayClass.new()
 	add_child(fog_overlay)
-	move_child(fog_overlay, 1)   # WorldMap=0, FogOverlay=1, Hero=2
+	move_child(fog_overlay, 1)
 
-	# Инициализируем состояние
-	current_location = GameState.current_location
+	# ── Жёсткий сброс состояния на стартовое ─────────────────────
+	# Всегда начинаем с Castle, открыты только Castle и Village.
+	# Не читаем GameState — он мог сохранить данные прошлой сессии.
+	current_location = "Castle"
+	GameState.current_location = "Castle"
+	GameState.unlocked_locations = ["Castle", "Village"]
+
 	for id in WAYPOINTS.keys():
 		unlocked[id] = false
-	unlocked["Castle"] = true
+	unlocked["Castle"]  = true
 	unlocked["Village"] = true
 
-	# Позиция героя
-	hero.global_position = _pos(current_location)
+	# ── Позиция героя ─────────────────────────────────────────────
+	hero.global_position = _pos("Castle")
 	hero.arrived.connect(_on_hero_arrived)
 
-	# Открываем туман у стартовых локаций
+	# ── Туман: открываем замок и деревню ─────────────────────────
 	fog_overlay.reveal(_pos("Castle"))
 	fog_overlay.reveal(_pos("Village"))
 
@@ -144,7 +182,7 @@ func _find_any_waypoint(mouse_pos: Vector2, radius: float) -> String:
 	var best := ""
 	var best_dist := radius
 	for id in WAYPOINTS.keys():
-		if not unlocked.get(id, false):
+		if not (unlocked.get(id, false) as bool):
 			continue
 		var d := mouse_pos.distance_to(_pos(id))
 		if d < best_dist:
@@ -153,7 +191,7 @@ func _find_any_waypoint(mouse_pos: Vector2, radius: float) -> String:
 	return best
 
 func _is_accessible(id: String) -> bool:
-	if not unlocked.get(id, false):
+	if not (unlocked.get(id, false) as bool):
 		return false
 	if id == current_location:
 		return false
@@ -204,7 +242,7 @@ func _on_hero_arrived(location_name: String) -> void:
 
 	# Открываем соседние локации
 	for neighbor in ROUTES[location_name]:
-		if not unlocked.get(neighbor, false):
+		if not (unlocked.get(neighbor, false) as bool):
 			unlocked[neighbor] = true
 			fog_overlay.reveal(_pos(neighbor))
 
@@ -252,9 +290,9 @@ func _draw_waypoints() -> void:
 	var t := Time.get_ticks_msec() * 0.003
 	for id in WAYPOINTS.keys():
 		var pos  := _pos(id)
-		var open := unlocked.get(id, false)
-		var is_current    := id == current_location
-		var is_accessible := _is_accessible(id)
+		var open: bool = unlocked.get(id, false)
+		var is_current: bool    = (id == current_location)
+		var is_accessible: bool = _is_accessible(id)
 
 		if not open:
 			# Закрытая: маленький тусклый кружок (виден сквозь туман)
