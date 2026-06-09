@@ -5,11 +5,11 @@ extends Node2D
 @onready var unlocked_label: Label = $UI/StatusPanel/UnlockedLabel
 
 const WAYPOINTS := {
-	"Castle":    Vector2(-851, 10),
-	"Village":   Vector2(-682, -341),
-	"Mine":      Vector2(-409, -572),
-	"Ruins":     Vector2(-419, -214),
-	"MageTower": Vector2(-366, -115),
+	"Castle":    Vector2(-1213, -758),
+	"Village":   Vector2(-1049, -521),
+	"Mine":      Vector2(-654, -797),
+	"Ruins":     Vector2(-917, -389),
+	"MageTower": Vector2(-654, -231),
 }
 
 const ROUTES := {

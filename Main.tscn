@@ -15,7 +15,7 @@ position = Vector2(-687, -547)
 texture = ExtResource("1_map")
 
 [node name="Hero" type="CharacterBody2D" parent="."]
-position = Vector2(-851, 10)
+position = Vector2(-1213, -758)
 script = ExtResource("3_hero")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Hero"]
