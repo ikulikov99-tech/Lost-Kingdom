@@ -93,7 +93,8 @@ func _ready() -> void:
 	unlocked["Village"] = true
 
 	hero.global_position = _pos("Castle")
-	hero.arrived.connect(_on_hero_arrived)
+	if not hero.arrived.is_connected(_on_hero_arrived):
+		hero.arrived.connect(_on_hero_arrived)
 
 	# Туман: открыть только Castle и Village
 	fog_overlay.reveal(_pos("Castle"))
@@ -220,6 +221,10 @@ func _sample_cv_path(forward: bool) -> Array[Vector2]:
 			i -= 1
 		pts.append(_pos("Castle"))          # точный финиш
 	return pts
+
+func _exit_tree() -> void:
+	if hero != null and hero.arrived.is_connected(_on_hero_arrived):
+		hero.arrived.disconnect(_on_hero_arrived)
 
 func on_route_event(_from: String, _to: String) -> void:
 	pass   # stub
