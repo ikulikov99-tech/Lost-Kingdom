@@ -20,7 +20,6 @@ func _ready() -> void:
 	# Не блокировать клики
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_sync_revealed()
-	_sync_trail()
 
 ## Открыть область вокруг мировой позиции pos
 func reveal(pos: Vector2) -> void:
@@ -30,11 +29,12 @@ func reveal(pos: Vector2) -> void:
 	_revealed.append(pos)
 	_sync_revealed()
 
-## Обновить позицию камеры в шейдере (вызывать каждый кадр из Main._process)
+## Обновить позицию камеры и time в шейдере (вызывать каждый кадр из Main._process)
 func update_camera(cam_pos: Vector2, zoom: float, vp_size: Vector2) -> void:
 	_mat.set_shader_parameter("cam_pos",  cam_pos)
 	_mat.set_shader_parameter("cam_zoom", zoom)
 	_mat.set_shader_parameter("vp_size",  vp_size)
+	_mat.set_shader_parameter("time", Time.get_ticks_msec() * 0.001)
 
 ## Позиция героя — движется с ним, не пишет в _revealed, не меняет счётчик.
 func update_hero_pos(pos: Vector2) -> void:
@@ -43,7 +43,6 @@ func update_hero_pos(pos: Vector2) -> void:
 ## Добавить точку пройденного пути. FIFO: при переполнении убираем самую старую.
 ## Не влияет на счётчик. Очищается при прибытии в локацию (clear_trail).
 func add_trail_point(pos: Vector2) -> void:
-	# Не добавлять если уже есть близкая точка
 	for p in _trail:
 		if p.distance_to(pos) < 60.0:
 			return
