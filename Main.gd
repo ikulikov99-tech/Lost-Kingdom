@@ -70,8 +70,22 @@ var available: Dictionary       = {}   # id -> bool
 const TRAIL_STEP := 110.0
 var _last_trail_pos: Vector2 = Vector2(-99999.0, -99999.0)
 
+# ── Исследование дороги Castle↔Village (Шаг 1) ───────────────────
+# Расстояние от клика до кривой чтобы засчитать попадание
+const ROAD_CLICK_DIST  := 35.0
+# Радиус видимости — совпадает с reveal_r шейдера
+const ROAD_VISIBLE_R   := 160.0
+# Расстояние до вейпоинта чтобы засчитать прибытие
+const ARRIVAL_RADIUS   := 60.0
+# Смещение героя вдоль CastleVillagePath (0 = Castle, get_baked_length = Village)
+# 0.0 означает «стоит в локации, не на дороге»
+var _cv_offset: float = 0.0
+
 # ──────────────── Инициализация ──────────────────────────────────
 func _ready() -> void:
+	# Кривая Castle<->Village загружается из Main.tscn (Curve2D_castle_village).
+	# Для редактирования: выдели CastleVillagePath в сцене и двигай точки мышью.
+
 	current_location = "Castle"
 	GameState.current_location = "Castle"
 
@@ -118,7 +132,17 @@ func _input(event: InputEvent) -> void:
 	   event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		if hero.is_moving:
 			return
-		var clicked := _find_accessible_waypoint(get_global_mouse_position())
+		var world_pos := get_global_mouse_position()
+
+		# Новая механика: клик по дороге Castle↔Village
+		# Активна когда герой в Castle или уже идёт по этой дороге
+		if current_location == "Castle" or _cv_offset > 0.0:
+			if _try_road_click_cv(world_pos):
+				return
+
+		# Fallback: старая система переходов (все остальные дороги)
+		# Также работает для Village→Castle пока новая механика не охватывает обратный путь
+		var clicked := _find_accessible_waypoint(world_pos)
 		if clicked != "":
 			_try_move_to(clicked)
 
@@ -248,6 +272,48 @@ func _sample_path(path: Path2D, from_id: String, to_id: String, forward: bool) -
 		pts.append(_pos(from_id))
 	return pts
 
+# ──────────────── Механика дороги Castle↔Village ─────────────────
+func _try_road_click_cv(world_pos: Vector2) -> bool:
+	var curve := _cv_path.curve
+	var closest    := curve.get_closest_point(world_pos)
+	var target_off := curve.get_closest_offset(world_pos)
+
+	if world_pos.distance_to(closest) > ROAD_CLICK_DIST:
+		return false
+	# Двигаться только вперёд по дороге
+	if target_off <= _cv_offset + 5.0:
+		return false
+	# Точка клика должна быть в открытой зоне тумана
+	if not _is_road_point_visible(closest):
+		return false
+
+	_last_trail_pos = hero.global_position
+	hero.move_along_path("_road_cv_", _build_partial_cv_path(_cv_offset, target_off))
+	return true
+
+func _is_road_point_visible(point: Vector2) -> bool:
+	if hero.global_position.distance_to(point) < ROAD_VISIBLE_R:
+		return true
+	for id in discovered.keys():
+		if (discovered[id] as bool) and _pos(id).distance_to(point) < ROAD_VISIBLE_R:
+			return true
+	return false
+
+func _build_partial_cv_path(from_off: float, to_off: float) -> Array[Vector2]:
+	var curve    := _cv_path.curve
+	var total    := curve.get_baked_length()
+	var baked    := curve.get_baked_points()
+	var n        := baked.size()
+	var pts: Array[Vector2] = []
+
+	pts.append(curve.sample_baked(from_off))
+	for i in range(1, n - 1):
+		var pt_off := float(i) / float(n - 1) * total
+		if pt_off > from_off and pt_off < to_off:
+			pts.append(baked[i])
+	pts.append(curve.sample_baked(to_off))
+	return pts
+
 func _exit_tree() -> void:
 	if hero != null and hero.arrived.is_connected(_on_hero_arrived):
 		hero.arrived.disconnect(_on_hero_arrived)
@@ -257,16 +323,27 @@ func on_route_event(_from: String, _to: String) -> void:
 
 # ──────────────── Прибытие ───────────────────────────────────────
 func _on_hero_arrived(location_name: String) -> void:
+	if location_name == "_road_cv_":
+		_cv_offset = _cv_path.curve.get_closest_offset(hero.global_position)
+		if hero.global_position.distance_to(_pos("Village")) < ARRIVAL_RADIUS:
+			_arrive_at_location("Village")
+		else:
+			_debug_state("road_stop cv_offset=" + str(snapped(_cv_offset, 0.1)))
+			queue_redraw()
+		return
+	_arrive_at_location(location_name)
+
+## Открывает локацию: туман, счётчик, соседи. Вызывается при реальном прибытии.
+func _arrive_at_location(location_name: String) -> void:
 	current_location           = location_name
 	GameState.current_location = location_name
+	_cv_offset = 0.0
 
-	# Постоянный reveal локации — trail больше не нужен, зона покрыта
 	discovered[location_name] = true
 	fog_overlay.reveal(_pos(location_name))
 	fog_overlay.clear_trail()
 	_last_trail_pos = Vector2(-99999.0, -99999.0)
 
-	# Соседи становятся available для клика, но NOT discovered
 	for neighbor in ROUTES[location_name]:
 		available[neighbor] = true
 
@@ -314,7 +391,6 @@ func _draw_roads() -> void:
 							 (discovered.get(b, false) or available.get(b, false))
 			var col := Color(1.0, 0.85, 0.35, 0.8) if both else Color(0.4, 0.4, 0.4, 0.2)
 
-			# Маршруты по Path2D
 			var route_path: Path2D = null
 			if (a == "Castle" and b == "Village") or (a == "Village" and b == "Castle"):
 				route_path = _cv_path
@@ -354,10 +430,10 @@ func _draw_waypoints() -> void:
 			continue
 
 		var color: Color
-		if is_cur:         color = Color(0.2, 0.55, 1.0, 1.0)   # синий — текущая
-		elif is_acc:       color = Color(0.15, 0.9, 0.25, 1.0)  # зелёный — кликабельная
-		elif is_disc:      color = Color(0.7, 0.65, 0.3, 0.75)  # жёлтый — посещённая
-		else:              color = Color(0.5, 0.5, 0.5, 0.5)    # серый — available но не соседняя
+		if is_cur:         color = Color(0.2, 0.55, 1.0, 1.0)
+		elif is_acc:       color = Color(0.15, 0.9, 0.25, 1.0)
+		elif is_disc:      color = Color(0.7, 0.65, 0.3, 0.75)
+		else:              color = Color(0.5, 0.5, 0.5, 0.5)
 
 		draw_circle(pos, 20.0, color)
 		draw_arc(pos, 26.0, 0.0, TAU, 40, Color(1, 1, 1, 0.85), 2.5)
