@@ -14,6 +14,9 @@ extends Node2D
 @onready var _cv_path: Path2D = $CastleVillagePath
 @onready var _vd_path: Path2D = $VillageDockPath
 @onready var _vr_path: Path2D = $VillageRuinsPath
+@onready var _vl_path: Path2D = $VillageLumbermillPath
+@onready var _km_path: Path2D = $KnightRuinsMageTowerPath
+@onready var _ke_path: Path2D = $KnightRuinsEarthMagePath
 
 # ──────────────── Координаты ─────────────────────────────────────
 const WAYPOINTS := {
@@ -42,17 +45,6 @@ const ROUTES := {
 
 # Промежуточные точки для маршрутов без Path2D
 const ROAD_PATHS := {
-	"Village->Lumbermill": [
-		Vector2(-832,  -608),
-		Vector2(-736,  -688),
-	],
-	"KnightRuins->MageTower": [
-		Vector2(-604,  -304),
-	],
-	"KnightRuins->EarthMageCastle": [
-		Vector2(-576,  -376),
-		Vector2(-512,  -440),
-	],
 	"EarthMageCastle->DarkCastle": [
 		Vector2(-420,  -528),
 	],
@@ -204,6 +196,21 @@ func _try_move_to(id: String) -> void:
 	   (current_location == "KnightRuins" and id == "Village"):
 		hero.move_along_path(id, _sample_path(_vr_path, "Village", "KnightRuins", current_location == "Village"))
 		return
+	# Village↔Lumbermill
+	if (current_location == "Village" and id == "Lumbermill") or \
+	   (current_location == "Lumbermill" and id == "Village"):
+		hero.move_along_path(id, _sample_path(_vl_path, "Village", "Lumbermill", current_location == "Village"))
+		return
+	# KnightRuins↔MageTower
+	if (current_location == "KnightRuins" and id == "MageTower") or \
+	   (current_location == "MageTower" and id == "KnightRuins"):
+		hero.move_along_path(id, _sample_path(_km_path, "KnightRuins", "MageTower", current_location == "KnightRuins"))
+		return
+	# KnightRuins↔EarthMageCastle
+	if (current_location == "KnightRuins" and id == "EarthMageCastle") or \
+	   (current_location == "EarthMageCastle" and id == "KnightRuins"):
+		hero.move_along_path(id, _sample_path(_ke_path, "KnightRuins", "EarthMageCastle", current_location == "KnightRuins"))
+		return
 
 	# Остальные маршруты — промежуточные точки
 	hero.move_along_path(id, _build_waypoint_path(current_location, id))
@@ -315,6 +322,12 @@ func _draw_roads() -> void:
 				route_path = _vd_path
 			elif (a == "KnightRuins" and b == "Village") or (a == "Village" and b == "KnightRuins"):
 				route_path = _vr_path
+			elif (a == "Lumbermill" and b == "Village") or (a == "Village" and b == "Lumbermill"):
+				route_path = _vl_path
+			elif (a == "KnightRuins" and b == "MageTower") or (a == "MageTower" and b == "KnightRuins"):
+				route_path = _km_path
+			elif (a == "EarthMageCastle" and b == "KnightRuins") or (a == "KnightRuins" and b == "EarthMageCastle"):
+				route_path = _ke_path
 
 			if route_path != null:
 				if route_path.curve != null:
