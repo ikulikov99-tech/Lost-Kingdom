@@ -28,7 +28,7 @@ uniform float reveal_r    = 160.0;
 uniform float edge_soft   = 40.0;
 
 // Цвет тумана: серые облака с высокой прозрачностью в открытых зонах
-uniform vec4 fog_color : source_color = vec4(0.10, 0.12, 0.18, 0.88);
+uniform vec4 fog_color : source_color = vec4(0.08, 0.10, 0.16, 0.95);
 
 void fragment() {
 	// SCREEN_UV: (0,0)=верхний левый, (1,1)=нижний правый

@@ -8,7 +8,7 @@ extends CharacterBody2D
 
 signal arrived(location_name: String)
 
-@export var walk_speed: float = 150.0
+@export var walk_speed: float = 80.0
 
 # ── Режим PathFollow2D ────────────────────────────────────────────
 var _pf_node:   PathFollow2D = null

@@ -229,11 +229,14 @@ func _on_hero_arrived(location_name: String) -> void:
 	current_location            = location_name
 	GameState.current_location  = location_name
 
-	# Открываем соседей — reveal вызывается ТОЛЬКО здесь, не в _process
+	# Раскрываем туман только вокруг текущей локации
+	fog_overlay.reveal(_pos(location_name))
+
+	# Соседей разблокируем (кликабельны), но туман НЕ раскрываем —
+	# он откроется когда герой сам туда придёт
 	for neighbor in ROUTES[location_name]:
 		if not (unlocked.get(neighbor, false) as bool):
 			unlocked[neighbor] = true
-			fog_overlay.reveal(_pos(neighbor))
 
 	GameState.unlocked_locations = _get_unlocked_list()
 	_update_ui()
