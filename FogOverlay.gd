@@ -33,6 +33,11 @@ func update_camera(cam_pos: Vector2, zoom: float, vp_size: Vector2) -> void:
 	_mat.set_shader_parameter("cam_zoom", zoom)
 	_mat.set_shader_parameter("vp_size",  vp_size)
 
+## Обновить позицию героя для визуального reveal во время движения.
+## Не добавляет в _revealed, не влияет на счётчик.
+func update_hero_pos(pos: Vector2) -> void:
+	_mat.set_shader_parameter("hero_pos", pos)
+
 func _sync_revealed() -> void:
 	_mat.set_shader_parameter("revealed_count", mini(_revealed.size(), MAX_LOCS))
 	for i in MAX_LOCS:

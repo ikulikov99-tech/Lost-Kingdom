@@ -122,6 +122,7 @@ func _screen_center_world() -> Vector2:
 func _push_camera_to_fog() -> void:
 	var vp_size := get_viewport().get_visible_rect().size
 	fog_overlay.update_camera(_screen_center_world(), camera.zoom.x, vp_size)
+	fog_overlay.update_hero_pos(hero.global_position)
 
 # ──────────────── Ввод ───────────────────────────────────────────
 func _input(event: InputEvent) -> void:
