@@ -41,11 +41,11 @@ uniform vec2  rp7 = vec2(-99999.0, -99999.0);
 uniform vec2  rp8 = vec2(-99999.0, -99999.0);
 
 // Радиус видимости и мягкость края
-uniform float reveal_r    = 160.0;
-uniform float edge_soft   = 40.0;
+uniform float reveal_r    = 135.0;
+uniform float edge_soft   = 18.0;
 
 // Цвет тумана: серые облака с высокой прозрачностью в открытых зонах
-uniform vec4 fog_color : source_color = vec4(0.08, 0.10, 0.16, 0.95);
+uniform vec4 fog_color : source_color = vec4(0.08, 0.10, 0.16, 0.98);
 
 void fragment() {
 	// SCREEN_UV: (0,0)=верхний левый, (1,1)=нижний правый
@@ -75,7 +75,7 @@ void fragment() {
 	if (trail_count > 6) min_perm_d = min(min_perm_d, distance(world_pos, tp6));
 	if (trail_count > 7) min_perm_d = min(min_perm_d, distance(world_pos, tp7));
 
-	// Текущая позиция героя (движется с ним, не location unlock)
+	// Текущая позиция героя (движется вместе с ним, не location unlock)
 	float hero_d = distance(world_pos, hero_pos);
 
 	float fog_perm  = smoothstep(reveal_r - edge_soft, reveal_r + edge_soft, min_perm_d);
