@@ -79,6 +79,12 @@ var discovered: Dictionary      = {}   # id -> bool
 # available: доступны для клика (соседи текущей), но туман не открыт
 var available: Dictionary       = {}   # id -> bool
 
+# Trail: расстояние между точками пути (px). При hero_reveal_r=160 и edge=40
+# перекрытие между соседними точками начинается с dist < 240. Шаг 110 даёт
+# надёжный overlap без лишних точек (8 точек × 110px = 880px покрытия).
+const TRAIL_STEP := 110.0
+var _last_trail_pos: Vector2 = Vector2(-99999.0, -99999.0)
+
 # ──────────────── Инициализация ──────────────────────────────────
 func _ready() -> void:
 	# Кривая Castle<->Village загружается из Main.tscn (Curve2D_castle_village).
@@ -135,8 +141,13 @@ func _input(event: InputEvent) -> void:
 			_try_move_to(clicked)
 
 func _physics_process(_delta: float) -> void:
-	# Камера двигается в physics_process — обновляем туман здесь же, без лага
 	_push_camera_to_fog()
+	# Пишем trail-точки во время движения
+	if hero.is_moving:
+		var hpos := hero.global_position
+		if _last_trail_pos.distance_to(hpos) >= TRAIL_STEP:
+			fog_overlay.add_trail_point(hpos)
+			_last_trail_pos = hpos
 
 func _process(_delta: float) -> void:
 	# Резервное обновление тумана на случай кадров без physics_process
@@ -184,6 +195,8 @@ func _is_accessible(id: String) -> bool:
 # ──────────────── Движение ───────────────────────────────────────
 func _try_move_to(id: String) -> void:
 	if not _is_accessible(id): return
+	# Сбрасываем trail-трекинг — первая точка добавится после TRAIL_STEP от старта
+	_last_trail_pos = hero.global_position
 	on_route_event(current_location, id)
 
 	# Castle <-> Village — сэмплируем Bezier-кривую
@@ -243,9 +256,11 @@ func _on_hero_arrived(location_name: String) -> void:
 	current_location           = location_name
 	GameState.current_location = location_name
 
-	# Добавляем в discovered — туман открывается, счётчик растёт
+	# Постоянный reveal локации — trail больше не нужен, зона покрыта
 	discovered[location_name] = true
 	fog_overlay.reveal(_pos(location_name))
+	fog_overlay.clear_trail()
+	_last_trail_pos = Vector2(-99999.0, -99999.0)
 
 	# Соседи становятся available для клика, но NOT discovered
 	for neighbor in ROUTES[location_name]:
