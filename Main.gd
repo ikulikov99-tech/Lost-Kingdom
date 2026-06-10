@@ -73,37 +73,41 @@ const ROAD_PATHS := {
 }
 
 # ──────────────── Состояние ──────────────────────────────────────
-var current_location: String = "Castle"
-var unlocked: Dictionary     = {}   # id -> bool
+var current_location: String    = "Castle"
+# discovered: туман открыт, считается в счётчике "Открыто"
+var discovered: Dictionary      = {}   # id -> bool
+# available: доступны для клика (соседи текущей), но туман не открыт
+var available: Dictionary       = {}   # id -> bool
 
 # ──────────────── Инициализация ──────────────────────────────────
 func _ready() -> void:
 	# Кривая Castle<->Village загружается из Main.tscn (Curve2D_castle_village).
-	# Точки с Bezier-касательными: Castle выход на юг, Village вход с запада.
 	# Для редактирования: выдели CastleVillagePath в сцене и двигай точки мышью.
 
-	# Сброс состояния
 	current_location = "Castle"
-	GameState.current_location  = "Castle"
-	GameState.unlocked_locations = ["Castle", "Village"]
+	GameState.current_location = "Castle"
 
 	for id in WAYPOINTS.keys():
-		unlocked[id] = false
-	unlocked["Castle"]  = true
-	unlocked["Village"] = true
+		discovered[id] = false
+		available[id]  = false
+
+	# Только Castle открыта туманом и считается в счётчике
+	discovered["Castle"] = true
+
+	# Соседи Castle доступны для клика, но не открыты
+	for neighbor in ROUTES["Castle"]:
+		available[neighbor] = true
 
 	hero.global_position = _pos("Castle")
 	if not hero.arrived.is_connected(_on_hero_arrived):
 		hero.arrived.connect(_on_hero_arrived)
 
-	# Туман: открыть только Castle и Village
+	# Туман: только Castle
 	fog_overlay.reveal(_pos("Castle"))
-	fog_overlay.reveal(_pos("Village"))
 
-	# Первое обновление тумана с корректной позицией камеры
 	_push_camera_to_fog()
-
 	_update_ui()
+	_debug_state("_ready")
 	queue_redraw()
 
 # ──────────────── Вспомогательные ────────────────────────────────
@@ -161,15 +165,19 @@ func _find_accessible_waypoint(mpos: Vector2, radius: float = 70.0) -> String:
 func _find_any_waypoint(mpos: Vector2, radius: float) -> String:
 	var best := ""; var best_d := radius
 	for id in WAYPOINTS.keys():
-		if not (unlocked.get(id, false) as bool): continue
+		# Тултип показываем для discovered и available локаций
+		if not (discovered.get(id, false) as bool) and not (available.get(id, false) as bool):
+			continue
 		var d := mpos.distance_to(_pos(id))
 		if d < best_d: best_d = d; best = id
 	return best
 
 func _is_accessible(id: String) -> bool:
-	if not (unlocked.get(id, false) as bool): return false
-	if id == current_location:                return false
-	if not ROUTES[current_location].has(id):  return false
+	# Можно кликнуть если локация available (или discovered) и является соседом текущей
+	if not (available.get(id, false) as bool) and not (discovered.get(id, false) as bool):
+		return false
+	if id == current_location:               return false
+	if not ROUTES[current_location].has(id): return false
 	return true
 
 # ──────────────── Движение ───────────────────────────────────────
@@ -231,33 +239,42 @@ func on_route_event(_from: String, _to: String) -> void:
 
 # ──────────────── Прибытие ───────────────────────────────────────
 func _on_hero_arrived(location_name: String) -> void:
-	current_location            = location_name
-	GameState.current_location  = location_name
+	current_location           = location_name
+	GameState.current_location = location_name
 
-	# Раскрываем туман только вокруг текущей локации
+	# Добавляем в discovered — туман открывается, счётчик растёт
+	discovered[location_name] = true
 	fog_overlay.reveal(_pos(location_name))
 
-	# Соседей разблокируем (кликабельны), но туман НЕ раскрываем —
-	# он откроется когда герой сам туда придёт
+	# Соседи становятся available для клика, но NOT discovered
 	for neighbor in ROUTES[location_name]:
-		if not (unlocked.get(neighbor, false) as bool):
-			unlocked[neighbor] = true
+		available[neighbor] = true
 
-	GameState.unlocked_locations = _get_unlocked_list()
+	GameState.unlocked_locations = _get_discovered_list()
 	_update_ui()
+	_debug_state("arrived: " + location_name)
 	queue_redraw()
 
 # ──────────────── UI ─────────────────────────────────────────────
-func _get_unlocked_list() -> Array[String]:
+func _get_discovered_list() -> Array[String]:
 	var r: Array[String] = []
-	for id in unlocked.keys():
-		if unlocked[id]: r.append(id)
+	for id in discovered.keys():
+		if discovered[id]: r.append(id)
 	return r
 
 func _update_ui() -> void:
 	current_label.text  = "Текущее: " + _title(current_location)
-	unlocked_label.text = "Открыто: " + str(_get_unlocked_list().size()) + \
+	unlocked_label.text = "Открыто: " + str(_get_discovered_list().size()) + \
 						  " / " + str(WAYPOINTS.size())
+
+func _debug_state(context: String) -> void:
+	print("[DEBUG] === ", context, " ===")
+	print("[DEBUG] current_location: ", current_location)
+	print("[DEBUG] discovered: ", _get_discovered_list())
+	var av: Array[String] = []
+	for id in available.keys():
+		if available[id]: av.append(id)
+	print("[DEBUG] available: ", av)
 
 # ──────────────── Отрисовка ──────────────────────────────────────
 func _draw() -> void:
@@ -273,7 +290,8 @@ func _draw_roads() -> void:
 			if drawn.has(rk): continue
 			drawn[rk] = true
 
-			var both: bool = unlocked.get(a, false) and unlocked.get(b, false)
+			var both: bool = (discovered.get(a, false) or available.get(a, false)) and \
+							 (discovered.get(b, false) or available.get(b, false))
 			var col := Color(1.0, 0.85, 0.35, 0.8) if both else Color(0.4, 0.4, 0.4, 0.2)
 
 			# Castle<->Village — рисуем по кривой Path2D
@@ -291,19 +309,21 @@ func _draw_roads() -> void:
 func _draw_waypoints() -> void:
 	var t := Time.get_ticks_msec() * 0.003
 	for id in WAYPOINTS.keys():
-		var pos         := _pos(id)
-		var open: bool   = unlocked.get(id, false)
-		var is_cur: bool = (id == current_location)
-		var is_acc: bool = _is_accessible(id)
+		var pos          := _pos(id)
+		var is_disc: bool = discovered.get(id, false)
+		var is_avail: bool = available.get(id, false)
+		var is_cur: bool  = (id == current_location)
+		var is_acc: bool  = _is_accessible(id)
 
-		if not open:
+		if not is_disc and not is_avail:
 			draw_circle(pos, 8.0, Color(0.3, 0.3, 0.3, 0.3))
 			continue
 
 		var color: Color
-		if is_cur:    color = Color(0.2, 0.55, 1.0, 1.0)
-		elif is_acc:  color = Color(0.15, 0.9, 0.25, 1.0)
-		else:         color = Color(0.7, 0.65, 0.3, 0.75)
+		if is_cur:         color = Color(0.2, 0.55, 1.0, 1.0)   # синий — текущая
+		elif is_acc:       color = Color(0.15, 0.9, 0.25, 1.0)  # зелёный — кликабельная
+		elif is_disc:      color = Color(0.7, 0.65, 0.3, 0.75)  # жёлтый — посещённая
+		else:              color = Color(0.5, 0.5, 0.5, 0.5)    # серый — available но не соседняя
 
 		draw_circle(pos, 20.0, color)
 		draw_arc(pos, 26.0, 0.0, TAU, 40, Color(1, 1, 1, 0.85), 2.5)
