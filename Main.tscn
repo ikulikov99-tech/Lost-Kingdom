@@ -11,6 +11,18 @@ _data = {
 }
 point_count = 15
 
+[sub_resource type="Curve2D" id="Curve2D_village_dock"]
+_data = {
+"points": PackedVector2Array(0, 0, 0, 0, -928, -504, 0, 0, 0, 0, -1008, -400, 0, 0, 0, 0, -1080, -280, 0, 0, 0, 0, -1160, -192, 0, 0, 0, 0, -1160, -128)
+}
+point_count = 5
+
+[sub_resource type="Curve2D" id="Curve2D_village_ruins"]
+_data = {
+"points": PackedVector2Array(0, 0, 0, 0, -928, -504, 0, 0, 0, 0, -840, -416, 0, 0, 0, 0, -744, -352, 0, 0, 0, 0, -648, -288)
+}
+point_count = 4
+
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_hero"]
 size = Vector2(28, 40)
 
@@ -27,6 +39,12 @@ curve = SubResource("Curve2D_castle_village")
 [node name="HeroFollower" type="PathFollow2D" parent="CastleVillagePath" unique_id=1086056321]
 position = Vector2(-1112, -704)
 rotates = false
+
+[node name="VillageDockPath" type="Path2D" parent="." unique_id=408531200]
+curve = SubResource("Curve2D_village_dock")
+
+[node name="VillageRuinsPath" type="Path2D" parent="." unique_id=408531201]
+curve = SubResource("Curve2D_village_ruins")
 
 [node name="Hero" type="CharacterBody2D" parent="." unique_id=253898775]
 position = Vector2(-1112, -704)

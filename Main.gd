@@ -10,8 +10,10 @@ extends Node2D
 @onready var tooltip_label: Label   = $UI/TooltipLabel
 @onready var fog_overlay: ColorRect = $UI/FogOverlay
 
-# Path2D для Castle<->Village (HeroFollower не используется в runtime)
+# Path2D маршруты (HeroFollower не используется в runtime)
 @onready var _cv_path: Path2D = $CastleVillagePath
+@onready var _vd_path: Path2D = $VillageDockPath
+@onready var _vr_path: Path2D = $VillageRuinsPath
 
 # ──────────────── Координаты ─────────────────────────────────────
 const WAYPOINTS := {
@@ -40,15 +42,6 @@ const ROUTES := {
 
 # Промежуточные точки для маршрутов без Path2D
 const ROAD_PATHS := {
-	"Village->Dock": [
-		Vector2(-1008, -400),
-		Vector2(-1080, -280),
-		Vector2(-1160, -192),
-	],
-	"Village->KnightRuins": [
-		Vector2(-840,  -416),
-		Vector2(-744,  -352),
-	],
 	"Village->Lumbermill": [
 		Vector2(-832,  -608),
 		Vector2(-736,  -688),
@@ -87,9 +80,6 @@ var _last_trail_pos: Vector2 = Vector2(-99999.0, -99999.0)
 
 # ──────────────── Инициализация ──────────────────────────────────
 func _ready() -> void:
-	# Кривая Castle<->Village загружается из Main.tscn (Curve2D_castle_village).
-	# Для редактирования: выдели CastleVillagePath в сцене и двигай точки мышью.
-
 	current_location = "Castle"
 	GameState.current_location = "Castle"
 
@@ -199,11 +189,20 @@ func _try_move_to(id: String) -> void:
 	_last_trail_pos = hero.global_position
 	on_route_event(current_location, id)
 
-	# Castle <-> Village — сэмплируем Bezier-кривую
+	# Маршруты через Path2D — Castle↔Village
 	if (current_location == "Castle" and id == "Village") or \
 	   (current_location == "Village" and id == "Castle"):
-		var pts := _sample_cv_path(current_location == "Castle")
-		hero.move_along_path(id, pts)
+		hero.move_along_path(id, _sample_path(_cv_path, "Castle", "Village", current_location == "Castle"))
+		return
+	# Village↔Dock
+	if (current_location == "Village" and id == "Dock") or \
+	   (current_location == "Dock" and id == "Village"):
+		hero.move_along_path(id, _sample_path(_vd_path, "Village", "Dock", current_location == "Village"))
+		return
+	# Village↔KnightRuins
+	if (current_location == "Village" and id == "KnightRuins") or \
+	   (current_location == "KnightRuins" and id == "Village"):
+		hero.move_along_path(id, _sample_path(_vr_path, "Village", "KnightRuins", current_location == "Village"))
 		return
 
 	# Остальные маршруты — промежуточные точки
@@ -223,25 +222,23 @@ func _build_waypoint_path(from_id: String, to_id: String) -> Array[Vector2]:
 	pts.append(_pos(to_id))
 	return pts
 
-## Возвращает точки кривой Castle<->Village из Bezier-сэмплирования.
-## Первая и последняя точки — точные координаты вейпоинтов (не из кривой).
-## forward=true: Castle→Village, false: Village→Castle
-func _sample_cv_path(forward: bool) -> Array[Vector2]:
+## Сэмплирует Path2D: первая и последняя точки — точные координаты вейпоинтов.
+## forward=true: from_id→to_id, false: to_id→from_id
+func _sample_path(path: Path2D, from_id: String, to_id: String, forward: bool) -> Array[Vector2]:
 	var pts: Array[Vector2] = []
-	var baked := _cv_path.curve.get_baked_points()  # PackedVector2Array
-
+	var baked := path.curve.get_baked_points()  # PackedVector2Array
 	if forward:
-		pts.append(_pos("Castle"))          # точный старт
+		pts.append(_pos(from_id))
 		for i in range(1, baked.size() - 1):
 			pts.append(baked[i])
-		pts.append(_pos("Village"))         # точный финиш
+		pts.append(_pos(to_id))
 	else:
-		pts.append(_pos("Village"))         # точный старт (обратно)
+		pts.append(_pos(to_id))
 		var i := baked.size() - 2
 		while i > 0:
 			pts.append(baked[i])
 			i -= 1
-		pts.append(_pos("Castle"))          # точный финиш
+		pts.append(_pos(from_id))
 	return pts
 
 func _exit_tree() -> void:
@@ -310,10 +307,18 @@ func _draw_roads() -> void:
 							 (discovered.get(b, false) or available.get(b, false))
 			var col := Color(1.0, 0.85, 0.35, 0.8) if both else Color(0.4, 0.4, 0.4, 0.2)
 
-			# Castle<->Village — рисуем по кривой Path2D
+			# Маршруты по Path2D
+			var route_path: Path2D = null
 			if (a == "Castle" and b == "Village") or (a == "Village" and b == "Castle"):
-				if _cv_path != null and _cv_path.curve != null:
-					var baked := _cv_path.curve.get_baked_points()
+				route_path = _cv_path
+			elif (a == "Dock" and b == "Village") or (a == "Village" and b == "Dock"):
+				route_path = _vd_path
+			elif (a == "KnightRuins" and b == "Village") or (a == "Village" and b == "KnightRuins"):
+				route_path = _vr_path
+
+			if route_path != null:
+				if route_path.curve != null:
+					var baked := route_path.curve.get_baked_points()
 					for i in range(baked.size() - 1):
 						draw_line(baked[i], baked[i + 1], col, 4.0)
 				continue
