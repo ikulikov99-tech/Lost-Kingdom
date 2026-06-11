@@ -93,14 +93,38 @@ limit_bottom = -77
 
 [node name="UI" type="CanvasLayer" parent="." unique_id=1886279063]
 
-[node name="FogOverlay" type="ColorRect" parent="UI" unique_id=2074669519]
+[node name="FogOverlay" type="SubViewportContainer" parent="UI" unique_id=2074669519]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+stretch = true
 script = ExtResource("4_fog")
+
+[node name="FogViewport" type="SubViewport" parent="UI/FogOverlay" unique_id=2074669520]
+transparent_bg = true
+handle_input_locally = false
+gui_disable_input = true
+
+[node name="FogBase" type="ColorRect" parent="UI/FogOverlay/FogViewport" unique_id=2074669521]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Clouds" type="Node2D" parent="UI/FogOverlay/FogViewport" unique_id=2074669522]
+
+[node name="RevealMask" type="ColorRect" parent="UI/FogOverlay/FogViewport" unique_id=2074669523]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="StatusPanel" type="Panel" parent="UI" unique_id=621191365]
 offset_left = 20.0

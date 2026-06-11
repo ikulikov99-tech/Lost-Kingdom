@@ -8,7 +8,7 @@ extends Node2D
 @onready var current_label: Label   = $UI/StatusPanel/CurrentLabel
 @onready var unlocked_label: Label  = $UI/StatusPanel/UnlockedLabel
 @onready var tooltip_label: Label   = $UI/TooltipLabel
-@onready var fog_overlay: ColorRect = $UI/FogOverlay
+@onready var fog_overlay: Control = $UI/FogOverlay
 
 # Path2D маршруты (HeroFollower не используется в runtime)
 @onready var _cv_path: Path2D = $CastleVillagePath
@@ -273,6 +273,7 @@ func _sample_path(path: Path2D, from_id: String, to_id: String, forward: bool) -
 	return pts
 
 # ──────────────── Механика дороги Castle↔Village ─────────────────
+## Возвращает true и запускает движение если клик попал на видимую дорогу.
 func _try_road_click_cv(world_pos: Vector2) -> bool:
 	var curve := _cv_path.curve
 	var closest    := curve.get_closest_point(world_pos)
@@ -291,6 +292,8 @@ func _try_road_click_cv(world_pos: Vector2) -> bool:
 	hero.move_along_path("_road_cv_", _build_partial_cv_path(_cv_offset, target_off))
 	return true
 
+## Проверяет, попадает ли точка в открытую зону тумана.
+## Зеркалит логику шейдера: radial reveal вокруг героя и discovered-локаций.
 func _is_road_point_visible(point: Vector2) -> bool:
 	if hero.global_position.distance_to(point) < ROAD_VISIBLE_R:
 		return true
@@ -299,6 +302,8 @@ func _is_road_point_visible(point: Vector2) -> bool:
 			return true
 	return false
 
+## Строит частичный путь вдоль CastleVillagePath от from_off до to_off.
+## Первая и последняя точки — точные результаты sample_baked.
 func _build_partial_cv_path(from_off: float, to_off: float) -> Array[Vector2]:
 	var curve    := _cv_path.curve
 	var total    := curve.get_baked_length()
@@ -324,7 +329,9 @@ func on_route_event(_from: String, _to: String) -> void:
 # ──────────────── Прибытие ───────────────────────────────────────
 func _on_hero_arrived(location_name: String) -> void:
 	if location_name == "_road_cv_":
+		# Остановка на дороге Castle↔Village, не в локации
 		_cv_offset = _cv_path.curve.get_closest_offset(hero.global_position)
+		# Если герой достаточно близко к Village — открываем её
 		if hero.global_position.distance_to(_pos("Village")) < ARRIVAL_RADIUS:
 			_arrive_at_location("Village")
 		else:
@@ -337,7 +344,7 @@ func _on_hero_arrived(location_name: String) -> void:
 func _arrive_at_location(location_name: String) -> void:
 	current_location           = location_name
 	GameState.current_location = location_name
-	_cv_offset = 0.0
+	_cv_offset = 0.0   # герой в локации, не на дороге
 
 	discovered[location_name] = true
 	fog_overlay.reveal(_pos(location_name))
@@ -391,6 +398,7 @@ func _draw_roads() -> void:
 							 (discovered.get(b, false) or available.get(b, false))
 			var col := Color(1.0, 0.85, 0.35, 0.8) if both else Color(0.4, 0.4, 0.4, 0.2)
 
+			# Маршруты по Path2D
 			var route_path: Path2D = null
 			if (a == "Castle" and b == "Village") or (a == "Village" and b == "Castle"):
 				route_path = _cv_path
@@ -430,10 +438,10 @@ func _draw_waypoints() -> void:
 			continue
 
 		var color: Color
-		if is_cur:         color = Color(0.2, 0.55, 1.0, 1.0)
-		elif is_acc:       color = Color(0.15, 0.9, 0.25, 1.0)
-		elif is_disc:      color = Color(0.7, 0.65, 0.3, 0.75)
-		else:              color = Color(0.5, 0.5, 0.5, 0.5)
+		if is_cur:         color = Color(0.2, 0.55, 1.0, 1.0)   # синий — текущая
+		elif is_acc:       color = Color(0.15, 0.9, 0.25, 1.0)  # зелёный — кликабельная
+		elif is_disc:      color = Color(0.7, 0.65, 0.3, 0.75)  # жёлтый — посещённая
+		else:              color = Color(0.5, 0.5, 0.5, 0.5)    # серый — available но не соседняя
 
 		draw_circle(pos, 20.0, color)
 		draw_arc(pos, 26.0, 0.0, TAU, 40, Color(1, 1, 1, 0.85), 2.5)
@@ -443,7 +451,8 @@ func _draw_waypoints() -> void:
 			draw_arc(pos, 32.0 + pulse * 6.0, 0.0, TAU, 40,
 					 Color(0.3, 1.0, 0.4, 0.55 * pulse), 2.0)
 
-		draw_string(ThemeDB.fallback_font,
-			pos + Vector2(-40, 40), _title(id),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
-			Color(1.0, 1.0, 0.75, 0.95))
+		if is_disc:
+			draw_string(ThemeDB.fallback_font,
+				pos + Vector2(-40, 40), _title(id),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
+				Color(1.0, 1.0, 0.75, 0.95))
