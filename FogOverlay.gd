@@ -14,10 +14,11 @@ const MAX_LOCS  := 9
 const MAX_TRAIL := 8
 
 # Puff-слои: масштаб, прозрачность, кол-во спрайтов, скорость дрейфа (px/сек, мир)
+# Много мелких перекрывающихся облаков вместо нескольких больших пятен
 const PUFF_LAYERS := [
-	{"scale": 1.2, "alpha": 0.50, "count": 3, "speed": 7.0},
-	{"scale": 1.8, "alpha": 0.65, "count": 3, "speed": 4.5},
-	{"scale": 2.5, "alpha": 0.80, "count": 2, "speed": 2.5},
+	{"scale": 0.45, "alpha": 0.30, "count": 10, "speed": 8.0},
+	{"scale": 0.70, "alpha": 0.38, "count": 8,  "speed": 5.0},
+	{"scale": 1.05, "alpha": 0.46, "count": 5,  "speed": 3.0},
 ]
 # Зона дрейфа puff-облаков — карта с запасом (limits Camera2D + margin)
 const WORLD_MIN := Vector2(-1900.0, -1350.0)
@@ -76,8 +77,8 @@ func _spawn_puffs() -> void:
 			tex_i += 1
 			spr.scale    = Vector2.ONE * (layer["scale"] as float)
 			spr.rotation = rng.randf_range(-0.3, 0.3)
-			# Холодный тон под цвет тумана
-			spr.modulate = Color(0.62, 0.68, 0.85, layer["alpha"] as float)
+			# Тёмный холодный тон — туман войны, не белые облака
+			spr.modulate = Color(0.36, 0.41, 0.58, layer["alpha"] as float)
 			_clouds.add_child(spr)
 			var anchor := Vector2(
 				rng.randf_range(WORLD_MIN.x, WORLD_MAX.x),

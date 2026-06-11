@@ -47,11 +47,10 @@ uniform vec2 rp8 = vec2(-99999.0, -99999.0);
 uniform float reveal_r  = 135.0;
 uniform float edge_soft = 18.0;
 
-// ── Рваные края: контрастная noise mask ──
+// ── Рваные края: контрастная noise mask, два масштаба ──
 uniform sampler2D edge_tex : repeat_enable, filter_linear_mipmap;
-uniform float edge_scale = 0.0011;  // масштаб выборки (мир → UV)
-uniform float edge_amp   = 48.0;    // амплитуда рваности, px
-uniform float edge_amp_hero = 20.0; // меньше шума у ореола героя
+uniform float edge_amp      = 75.0;  // амплитуда рваности (px): выступы и карманы
+uniform float edge_amp_hero = 58.0;  // у ореола героя — почти та же рваность
 
 void fragment() {
     vec2 screen_px = (UV - vec2(0.5)) * vp_size;
@@ -59,7 +58,12 @@ void fragment() {
 
     // Медленный дрейф маски краёв — границы «дышат»
     vec2 drift = vec2(time * 0.010, time * 0.007);
-    float edge_n = texture(edge_tex, world_pos * edge_scale + drift).r * 2.0 - 1.0;
+
+    // Два масштаба: крупный — языки и карманы, мелкий — рваная кромка
+    float n_big   = texture(edge_tex, world_pos * 0.0019 + drift).r;
+    float n_small = texture(edge_tex, world_pos * 0.0062 - drift * 1.6).r;
+    // Комбинация в диапазон ≈ -1..1, крупный шум доминирует
+    float edge_n = (n_big * 0.72 + n_small * 0.42) * 2.0 - 1.14;
 
     float min_perm_d = 1e9;
     if (revealed_count > 0) min_perm_d = min(min_perm_d, distance(world_pos, rp0));
