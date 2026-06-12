@@ -73,8 +73,11 @@ var _last_trail_pos: Vector2 = Vector2(-99999.0, -99999.0)
 # ── Исследование дорог через Path2D (Итерация 1) ─────────────────
 # Расстояние от клика до кривой чтобы засчитать попадание
 const ROAD_CLICK_DIST  := 35.0
-# Радиус видимости — совпадает с reveal_r шейдера
+# Радиус видимости вокруг открытых локаций — совпадает с reveal_r шейдера
 const ROAD_VISIBLE_R   := 160.0
+# Радиус видимости вокруг героя — совпадает с hero_reveal_r шейдера.
+# Уменьшен 160 -> 90: меньше обзор вперёд по дороге, сильнее исследование
+const HERO_VISIBLE_R   := 90.0
 # Расстояние до вейпоинта чтобы засчитать прибытие
 const ARRIVAL_RADIUS   := 60.0
 
@@ -360,7 +363,7 @@ func _start_road_move(path: Path2D, dest: String, cur_off: float,
 ## Проверяет, попадает ли точка в открытую зону тумана.
 ## Зеркалит логику шейдера: radial reveal вокруг героя и discovered-локаций.
 func _is_road_point_visible(point: Vector2) -> bool:
-	if hero.global_position.distance_to(point) < ROAD_VISIBLE_R:
+	if hero.global_position.distance_to(point) < HERO_VISIBLE_R:
 		return true
 	for id in discovered.keys():
 		if (discovered[id] as bool) and _pos(id).distance_to(point) < ROAD_VISIBLE_R:

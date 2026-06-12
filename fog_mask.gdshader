@@ -18,7 +18,8 @@ uniform float time     = 0.0;
 
 // ── Герой ──
 uniform vec2  hero_pos      = vec2(-99999.0, -99999.0);
-uniform float hero_reveal_r = 160.0;
+// Уменьшен 160 -> 90: игрок видит меньше вперёд, сильнее ощущение исследования
+uniform float hero_reveal_r = 90.0;
 
 // ── Trail (FIFO 8 точек) ──
 uniform int  trail_count = 0;
@@ -50,7 +51,7 @@ uniform float edge_soft = 18.0;
 // ── Рваные края: контрастная noise mask, два масштаба ──
 uniform sampler2D edge_tex : repeat_enable, filter_linear_mipmap;
 uniform float edge_amp      = 75.0;  // амплитуда рваности (px): выступы и карманы
-uniform float edge_amp_hero = 58.0;  // у ореола героя — почти та же рваность
+uniform float edge_amp_hero = 30.0;  // пропорционально hero_reveal_r=90
 
 void fragment() {
     vec2 screen_px = (UV - vec2(0.5)) * vp_size;
