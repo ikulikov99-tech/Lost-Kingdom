@@ -18,8 +18,8 @@ uniform float time     = 0.0;
 
 // ── Герой ──
 uniform vec2  hero_pos      = vec2(-99999.0, -99999.0);
-// Уменьшен 160 -> 90: игрок видит меньше вперёд, сильнее ощущение исследования
-uniform float hero_reveal_r = 90.0;
+// Уменьшен 160 -> 80 (-50%): игрок видит меньше вперёд, сильнее исследование
+uniform float hero_reveal_r = 80.0;
 
 // ── Trail (FIFO 8 точек) ──
 uniform int  trail_count = 0;

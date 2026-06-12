@@ -78,7 +78,7 @@ func _spawn_puffs() -> void:
 			spr.scale    = Vector2.ONE * (layer["scale"] as float)
 			spr.rotation = rng.randf_range(-0.3, 0.3)
 			# Тёмный холодный тон — туман войны, не белые облака
-			spr.modulate = Color(0.36, 0.41, 0.58, layer["alpha"] as float)
+			spr.modulate = Color(0.29, 0.33, 0.49, layer["alpha"] as float)
 			_clouds.add_child(spr)
 			var anchor := Vector2(
 				rng.randf_range(WORLD_MIN.x, WORLD_MAX.x),

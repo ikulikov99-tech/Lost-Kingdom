@@ -13,8 +13,8 @@ uniform float time     = 0.0;
 
 uniform sampler2D noise_tex : repeat_enable, filter_linear_mipmap;
 
-// Тёмно-синий мистический тон
-uniform vec4 fog_tint : source_color = vec4(0.07, 0.09, 0.15, 0.96);
+// Тёмно-синий мистический тон (затемнён ещё немного)
+uniform vec4 fog_tint : source_color = vec4(0.055, 0.072, 0.125, 0.96);
 
 void fragment() {
     vec2 screen_px = (UV - vec2(0.5)) * vp_size;
