@@ -70,16 +70,21 @@ var available: Dictionary       = {}   # id -> bool
 const TRAIL_STEP := 110.0
 var _last_trail_pos: Vector2 = Vector2(-99999.0, -99999.0)
 
-# ── Исследование дороги Castle↔Village (Шаг 1) ───────────────────
+# ── Исследование дорог через Path2D (Итерация 1) ─────────────────
 # Расстояние от клика до кривой чтобы засчитать попадание
 const ROAD_CLICK_DIST  := 35.0
 # Радиус видимости — совпадает с reveal_r шейдера
 const ROAD_VISIBLE_R   := 160.0
 # Расстояние до вейпоинта чтобы засчитать прибытие
 const ARRIVAL_RADIUS   := 60.0
-# Смещение героя вдоль CastleVillagePath (0 = Castle, get_baked_length = Village)
-# 0.0 означает «стоит в локации, не на дороге»
-var _cv_offset: float = 0.0
+
+# Состояние «герой остановился посреди дороги, не в локации».
+# Обобщает прежний _cv_offset на любую Path2D-дорогу.
+var _road_active: bool   = false   # true = герой стоит на дороге, не в локации
+var _road_path:   Path2D = null    # активная Path2D
+var _road_dest:   String = ""      # локация на дальнем конце дороги
+var _road_fwd:    bool   = true    # true = движение к увеличению offset кривой
+var _road_offset: float  = 0.0     # текущее смещение героя вдоль кривой (native)
 
 # ──────────────── Инициализация ──────────────────────────────────
 func _ready() -> void:
@@ -134,14 +139,11 @@ func _input(event: InputEvent) -> void:
 			return
 		var world_pos := get_global_mouse_position()
 
-		# Новая механика: клик по дороге Castle↔Village
-		# Активна когда герой в Castle или уже идёт по этой дороге
-		if current_location == "Castle" or _cv_offset > 0.0:
-			if _try_road_click_cv(world_pos):
-				return
+		# Новая механика: клик по видимому участку любой Path2D-дороги
+		if _try_road_click(world_pos):
+			return
 
-		# Fallback: старая система переходов (все остальные дороги)
-		# Также работает для Village→Castle пока новая механика не охватывает обратный путь
+		# Fallback: клик по иконке локации (ROAD_PATHS-маршруты, обратный путь)
 		var clicked := _find_accessible_waypoint(world_pos)
 		if clicked != "":
 			_try_move_to(clicked)
@@ -272,24 +274,75 @@ func _sample_path(path: Path2D, from_id: String, to_id: String, forward: bool) -
 		pts.append(_pos(from_id))
 	return pts
 
-# ──────────────── Механика дороги Castle↔Village ─────────────────
-## Возвращает true и запускает движение если клик попал на видимую дорогу.
-func _try_road_click_cv(world_pos: Vector2) -> bool:
-	var curve := _cv_path.curve
+# ──────────────── Механика исследования дорог ────────────────────
+## Path2D для пары локаций (или null, если маршрут не на Path2D).
+func _route_path_for(a: String, b: String) -> Path2D:
+	var s: Array = [a, b]
+	s.sort()
+	var key: String = str(s[0]) + "-" + str(s[1])
+	var by_key := {
+		"Castle-Village":              _cv_path,
+		"Dock-Village":                _vd_path,
+		"KnightRuins-Village":         _vr_path,
+		"Lumbermill-Village":          _vl_path,
+		"KnightRuins-MageTower":       _km_path,
+		"EarthMageCastle-KnightRuins": _ke_path,
+	}
+	return by_key.get(key, null)
+
+## Клик по видимому участку дороги. Возвращает true если движение запущено.
+func _try_road_click(world_pos: Vector2) -> bool:
+	# Уже на дороге — продолжаем только по ней
+	if _road_active:
+		return _start_road_move(_road_path, _road_dest, _road_offset, _road_fwd, world_pos)
+
+	# В локации — выбираем ближайшую Path2D-дорогу к соседу
+	var best_path: Path2D = null
+	var best_dest := ""
+	var best_d := ROAD_CLICK_DIST
+	for n: String in ROUTES[current_location]:
+		var p := _route_path_for(current_location, n)
+		if p == null:
+			continue
+		# Сосед должен быть кликабелен (available/discovered), скрытые — нельзя
+		if not (available.get(n, false) as bool) and not (discovered.get(n, false) as bool):
+			continue
+		var cp := p.curve.get_closest_point(world_pos)
+		var d := world_pos.distance_to(cp)
+		if d < best_d:
+			best_d = d
+			best_path = p
+			best_dest = n
+	if best_path == null:
+		return false
+
+	var start_off := best_path.curve.get_closest_offset(_pos(current_location))
+	var dest_off  := best_path.curve.get_closest_offset(_pos(best_dest))
+	return _start_road_move(best_path, best_dest, start_off, dest_off > start_off, world_pos)
+
+## Запускает частичное движение по дороге к точке клика (только вперёд к dest).
+func _start_road_move(path: Path2D, dest: String, cur_off: float,
+		fwd: bool, world_pos: Vector2) -> bool:
+	var curve := path.curve
 	var closest    := curve.get_closest_point(world_pos)
 	var target_off := curve.get_closest_offset(world_pos)
 
 	if world_pos.distance_to(closest) > ROAD_CLICK_DIST:
 		return false
-	# Двигаться только вперёд по дороге
-	if target_off <= _cv_offset + 5.0:
+	# Двигаться только в сторону dest, не назад
+	if fwd and target_off <= cur_off + 5.0:
 		return false
-	# Точка клика должна быть в открытой зоне тумана
+	if not fwd and target_off >= cur_off - 5.0:
+		return false
 	if not _is_road_point_visible(closest):
 		return false
 
+	# Зафиксировать активную дорогу — прибытие обновит offset/active
+	_road_path = path
+	_road_dest = dest
+	_road_fwd  = fwd
 	_last_trail_pos = hero.global_position
-	hero.move_along_path("_road_cv_", _build_partial_cv_path(_cv_offset, target_off))
+	hero.move_along_path("_road_", _build_partial_path(path, cur_off, target_off))
 	return true
 
 ## Проверяет, попадает ли точка в открытую зону тумана.
@@ -302,20 +355,28 @@ func _is_road_point_visible(point: Vector2) -> bool:
 			return true
 	return false
 
-## Строит частичный путь вдоль CastleVillagePath от from_off до to_off.
+## Частичный путь вдоль кривой от from_off до to_off (любое направление).
 ## Первая и последняя точки — точные результаты sample_baked.
-func _build_partial_cv_path(from_off: float, to_off: float) -> Array[Vector2]:
-	var curve    := _cv_path.curve
-	var total    := curve.get_baked_length()
-	var baked    := curve.get_baked_points()
-	var n        := baked.size()
+func _build_partial_path(path: Path2D, from_off: float, to_off: float) -> Array[Vector2]:
+	var curve := path.curve
+	var total := curve.get_baked_length()
+	var baked := curve.get_baked_points()
+	var n     := baked.size()
+	var lo    := minf(from_off, to_off)
+	var hi    := maxf(from_off, to_off)
 	var pts: Array[Vector2] = []
 
 	pts.append(curve.sample_baked(from_off))
-	for i in range(1, n - 1):
-		var pt_off := float(i) / float(n - 1) * total
-		if pt_off > from_off and pt_off < to_off:
-			pts.append(baked[i])
+	if to_off >= from_off:
+		for i in range(1, n - 1):
+			var po := float(i) / float(n - 1) * total
+			if po > lo and po < hi:
+				pts.append(baked[i])
+	else:
+		for i in range(n - 2, 0, -1):
+			var po := float(i) / float(n - 1) * total
+			if po > lo and po < hi:
+				pts.append(baked[i])
 	pts.append(curve.sample_baked(to_off))
 	return pts
 
@@ -328,14 +389,15 @@ func on_route_event(_from: String, _to: String) -> void:
 
 # ──────────────── Прибытие ───────────────────────────────────────
 func _on_hero_arrived(location_name: String) -> void:
-	if location_name == "_road_cv_":
-		# Остановка на дороге Castle↔Village, не в локации
-		_cv_offset = _cv_path.curve.get_closest_offset(hero.global_position)
-		# Если герой достаточно близко к Village — открываем её
-		if hero.global_position.distance_to(_pos("Village")) < ARRIVAL_RADIUS:
-			_arrive_at_location("Village")
+	if location_name == "_road_":
+		# Остановка посреди дороги, не в локации
+		_road_active = true
+		_road_offset = _road_path.curve.get_closest_offset(hero.global_position)
+		# Если герой достаточно близко к dest — открываем локацию
+		if hero.global_position.distance_to(_pos(_road_dest)) < ARRIVAL_RADIUS:
+			_arrive_at_location(_road_dest)
 		else:
-			_debug_state("road_stop cv_offset=" + str(snapped(_cv_offset, 0.1)))
+			_debug_state("road_stop %s off=%s" % [_road_dest, str(snapped(_road_offset, 0.1))])
 			queue_redraw()
 		return
 	_arrive_at_location(location_name)
@@ -344,7 +406,11 @@ func _on_hero_arrived(location_name: String) -> void:
 func _arrive_at_location(location_name: String) -> void:
 	current_location           = location_name
 	GameState.current_location = location_name
-	_cv_offset = 0.0   # герой в локации, не на дороге
+	# Сброс состояния дороги — герой в локации
+	_road_active = false
+	_road_path   = null
+	_road_dest   = ""
+	_road_offset = 0.0
 
 	discovered[location_name] = true
 	fog_overlay.reveal(_pos(location_name))
