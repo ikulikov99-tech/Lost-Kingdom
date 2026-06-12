@@ -7,41 +7,54 @@ PR: https://github.com/ikulikov99-tech/Lost-Kingdom/pull/2
 ЧТО СДЕЛАНО ПОСЛЕДНИМ
 ════════════════════════════════════════════════════════════════
 
-FBM-туман войны — живые облачные формы:
+Гибридный туман: рисованные облака + текстурный noise + шейдер-маска.
 
-  fog.gdshader:
-  - Добавлены функции hash / vnoise / fbm (4 октавы, mat2-ротация)
-  - Слой 1 (края): edge_n * 52px перемещает reveal_r → рваные пятна
-  - Слой 2 (текстура): cloud_n модулирует density (0.82–1.0) и RGB
-  - Дрейф: drift = vec2(time*0.018, time*0.011) — туман дышит
-  - Герой: reveal_r ± 22px — ореол живой, но стабильный
-  - Все game-логика uniforms (rp*, tp*, reveal_r) не изменены
+Архитектура (FogOverlay теперь SubViewportContainer):
+  FogViewport (SubViewport, transparent_bg)
+    1. FogBase (ColorRect)    — fog_base.gdshader: fog_density.png
+       в 2 масштабах с разным дрейфом → неоднородная плотность
+    2. Clouds (Node2D)        — 8 puff-спрайтов в 3 слоях
+       (1.2x/0.50a, 1.8x/0.65a, 2.5x/0.80a), world-anchored дрейф
+       с wrap, спавн из FogOverlay._spawn_puffs(), seed=20260611
+    3. RevealMask (ColorRect) — fog_mask.gdshader, blend_mul:
+       умножает альфу слоёв ниже; вся reveal-логика здесь;
+       края рвёт fog_edge_mask.png (edge_amp=48px)
 
-  FogOverlay.gd:
-  - Добавлена 1 строка: time = Time.get_ticks_msec() * 0.001
-    в существующую функцию update_camera()
+Ассеты в fog/: cloud_puff_1..6.png, fog_density.png, fog_edge_mask.png
+
+ВАЖНО: новые PNG требуют импорта Godot:
+  & "C:\Godot_v4.6-stable_win64.exe\Godot_v4.6.3-stable_win64.exe"
+    --headless --path <проект> --import --quit
 
 ════════════════════════════════════════════════════════════════
 ИЗМЕНЁННЫЕ ФАЙЛЫ
 ════════════════════════════════════════════════════════════════
 
-fog.gdshader    — полностью переписан (FBM + cloud layers)
-FogOverlay.gd   — +1 строка в update_camera (time uniform)
+FogOverlay.gd     — переписан: SubViewportContainer, puff-дрейф,
+                    два материала; ПУБЛИЧНЫЙ API НЕ ИЗМЕНИЛСЯ
+fog_mask.gdshader — НОВЫЙ: маска видимости (blend_mul) + рваные края
+fog_base.gdshader — НОВЫЙ: базовый noise-слой
+Main.tscn         — FogOverlay: ColorRect → SubViewportContainer + 4 узла
+Main.gd           — 1 строка: тип fog_overlay ColorRect → Control
+fog/              — НОВЫЕ ассеты (8 PNG + .import)
+fog.gdshader      — НЕ используется, оставлен как fallback (FBM-версия)
 
-НЕ тронуто: Main.gd, Hero.gd, Main.tscn, GameState.gd,
-            вся логика discovered/available/trail/счётчик
+Логика discovered/available/trail/счётчик/клики — НЕ ТРОНУТА.
 
 ════════════════════════════════════════════════════════════════
 ЧТО ПРОВЕРИТЬ
 ════════════════════════════════════════════════════════════════
 
-1. Запусти проект → Splash → HeroSelect → карта
-2. Туман неоднородный — видны облачные перепады плотности
-3. Края раскрытия вокруг Castle рваные, не круглые
-4. Туман медленно шевелится (дрейф ≈5-7 секунд на видимый сдвиг)
-5. Клики по дороге Castle→Village работают (механика не сломана)
-6. Счётчик 1/9 при старте, 2/9 при открытии Village
-7. FPS стабильный — MX250 вытягивает 4-октавный FBM без просадок
+1. Splash → HeroSelect → карта
+2. Туман = слоистые облака: видны рисованные puff-формы поверх
+   noise-подложки, медленно дрейфуют в разные стороны
+3. Края раскрытия рваные (текстурная маска, не круги)
+4. Клик по дороге Castle→Village работает, debug: road_stop
+5. Прибытие в Village: счётчик 2/9, debug: arrived: Village
+   (подтверждено в последнем запуске)
+6. FPS: SubViewport 1280x720 + 8 спрайтов — MX250 должен держать;
+   если просадка — уменьшить count в PUFF_LAYERS
+7. Клики проходят сквозь туман (mouse_filter=IGNORE на контейнере)
 
 ════════════════════════════════════════════════════════════════
 ТЕКУЩИЕ ПРОБЛЕМЫ
@@ -50,20 +63,20 @@ FogOverlay.gd   — +1 строка в update_camera (time uniform)
 KNOWN BUG (отложен): герой идёт задом на Village→Castle.
   Файл: Hero.gd. Фиксить после маршрутов.
 
+Возможная настройка: плотность/цвет облаков (modulate в PUFF_LAYERS,
+fog_tint в fog_base.gdshader) — по визуальному фидбеку пользователя.
+
+В корне проекта лежит файл с GitHub-токенами (русское имя) —
+НЕ КОММИТИТЬ. Стоит добавить в .gitignore или удалить.
+
 ════════════════════════════════════════════════════════════════
 СЛЕДУЮЩИЙ ШАГ
 ════════════════════════════════════════════════════════════════
 
-На выбор (по приоритету):
-
-A) Road-click механика для остальных дорог (Шаг 2)
-   Village↔Dock, Village↔KnightRuins, Village↔Lumbermill и т.д.
-   По образцу _try_road_click_cv в Main.gd.
-
-B) Перевести 3 оставшихся маршрута на Path2D
-   EarthMageCastle↔DarkCastle, EarthMageCastle↔Mine, Lumbermill↔Mine
-
-C) Исправить flip_h героя (Hero.gd)
+1. Визуальный фидбек пользователя по гибридному туману (тюнинг)
+2. Road-click механика для остальных дорог (Шаг 2)
+3. Перевести 3 маршрута на Path2D
+4. Исправить flip_h героя (Hero.gd)
 
 ════════════════════════════════════════════════════════════════
 КОНТЕКСТ ДЛЯ НОВОГО ИИ
@@ -72,8 +85,9 @@ C) Исправить flip_h героя (Hero.gd)
 Проект: RPG карта мира на Godot 4.6. Герой ходит по маршрутам между
 локациями, туман войны раскрывается по мере исследования.
 
-Главная сцена: Main.tscn. Запуск: Splash.tscn → HeroSelect.tscn → Main.
-Debug-логи появляются только после выбора героя на HeroSelect.
+Запуск: Splash.tscn → HeroSelect.tscn → Main.tscn.
+Debug-логи появляются только после выбора героя.
+Godot бинарь: C:\Godot_v4.6-stable_win64.exe\Godot_v4.6.3-stable_win64.exe
 
 Координаты — ТОЛЬКО из MAP_COORDINATES.md. Не угадывать.
 Полная архитектура: PROJECT_BACKUP.md

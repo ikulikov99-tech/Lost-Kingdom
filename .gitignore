@@ -1,3 +1,13 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+
+# Секреты — никогда не коммитить
+*токен*
+*token*
+*secret*
+*.pem
+*.key
+
+# Локальные скриншоты/артефакты Claude
+.claude/*.png

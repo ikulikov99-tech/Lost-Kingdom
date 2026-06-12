@@ -1,6 +1,6 @@
 # Lost Kingdom — Project Backup
 > Обновляется после каждой завершённой задачи.
-> Последнее обновление: 2026-06-11 (FBM fog)
+> Последнее обновление: 2026-06-11 (hybrid fog: painted clouds + mask)
 
 ---
 
@@ -95,20 +95,32 @@ Mine         ↔ Lumbermill, EarthMageCastle
 
 ## Реализованные системы
 
-### Туман войны
+### Туман войны (гибридная система: текстуры + маска)
 
-- Fullscreen GLSL shader на ColorRect в CanvasLayer (screen-space)
-- Конвертирует SCREEN_UV → мировые координаты через `cam_pos + screen_px / cam_zoom`
-- `camera.get_screen_center_position()` — учитывает zoom и limits Camera2D
+Структура внутри `UI/FogOverlay` (SubViewportContainer ← FogOverlay.gd):
+```
+FogViewport (SubViewport, transparent_bg)
+├── FogBase (ColorRect)    ← fog_base.gdshader: fog_density.png ×2 масштаба, дрейф
+├── Clouds (Node2D)        ← 8 рисованных puff Sprite2D (3 слоя: 1.2x/1.8x/2.5x)
+└── RevealMask (ColorRect) ← fog_mask.gdshader (blend_mul): маска видимости
+```
+
+- Маска умножает альфу всего под ней: 1 = туман остаётся, 0 = открыто
+- Вся reveal-логика (rp*, tp*, hero) — только в fog_mask.gdshader
+- Края рвёт текстура `fog/fog_edge_mask.png` (edge_amp = 48px)
+- Puff-облака: world-anchored дрейф с wrap по зоне карты, спавн из кода (seed фиксирован)
+- Облачные слои ничего не знают про reveal — независимы
+- Ассеты: `fog/cloud_puff_1..6.png`, `fog/fog_density.png`, `fog/fog_edge_mask.png`
+- `fog.gdshader` (FBM-версия) оставлен в репо как fallback, не используется
 - Два вида раскрытия: постоянное (discovered-локации) и временное (герой + trail)
 - Trail: FIFO 8 точек, шаг 110px, очищается при прибытии в локацию
 
-**Текущие параметры шейдера:**
+**Параметры маски (fog_mask.gdshader):**
 ```glsl
 reveal_r    = 135.0   // радиус постоянного раскрытия (локации + trail)
 edge_soft   = 18.0    // мягкость края
-hero_reveal_r = 160.0 // радиус раскрытия вокруг героя (не меняет счётчик)
-fog_color   = vec4(0.08, 0.10, 0.16, 0.98)
+hero_reveal_r = 160.0 // радиус вокруг героя (не меняет счётчик)
+edge_amp    = 48.0    // амплитуда рваных краёв (px)
 ```
 
 ### Маршруты через Path2D (6 из 9)
