@@ -143,10 +143,22 @@ func _input(event: InputEvent) -> void:
 		if _try_road_click(world_pos):
 			return
 
+		# Посреди дороги работают только клики по самой дороге —
+		# иначе _try_move_to построит путь от исходной локации (телепорт назад)
+		if _road_active:
+			return
+
 		# Fallback: клик по иконке локации (ROAD_PATHS-маршруты, обратный путь)
 		var clicked := _find_accessible_waypoint(world_pos)
-		if clicked != "":
-			_try_move_to(clicked)
+		if clicked == "":
+			return
+		# Неоткрытая локация с Path2D-дорогой достижима только исследованием
+		# дороги — слепой клик по иконке сквозь туман не пускаем
+		if not (discovered.get(clicked, false) as bool) \
+				and _route_path_for(current_location, clicked) != null \
+				and not _is_road_point_visible(_pos(clicked)):
+			return
+		_try_move_to(clicked)
 
 func _physics_process(_delta: float) -> void:
 	_push_camera_to_fog()
