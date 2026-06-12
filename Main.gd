@@ -71,13 +71,16 @@ const TRAIL_STEP := 110.0
 var _last_trail_pos: Vector2 = Vector2(-99999.0, -99999.0)
 
 # ── Исследование дорог через Path2D (Итерация 1) ─────────────────
-# Расстояние от клика до кривой чтобы засчитать попадание
-const ROAD_CLICK_DIST  := 35.0
-# Радиус видимости вокруг открытых локаций — совпадает с reveal_r шейдера
-const ROAD_VISIBLE_R   := 160.0
-# Радиус видимости вокруг героя — совпадает с hero_reveal_r шейдера.
-# Уменьшен 160 -> 80 (-50%): меньше обзор вперёд, сильнее исследование
-const HERO_VISIBLE_R   := 80.0
+# Расстояние от клика до кривой чтобы засчитать попадание.
+# Дорога на карте шире линии Path2D — радиус щедрый
+const ROAD_CLICK_DIST  := 50.0
+# Радиусы видимости = радиус шейдера + амплитуда шума краёв (edge_amp).
+# Логика принимает клик везде, где туман МОЖЕТ быть визуально открыт,
+# иначе клики в открытые «языки» тумана мёртвые (рассинхрон с маской).
+# Локации: reveal_r 135 + edge_amp 75
+const ROAD_VISIBLE_R   := 210.0
+# Герой: hero_reveal_r 80 + edge_amp_hero 30
+const HERO_VISIBLE_R   := 110.0
 # Расстояние до вейпоинта чтобы засчитать прибытие
 const ARRIVAL_RADIUS   := 60.0
 
@@ -346,10 +349,14 @@ func _start_road_move(path: Path2D, dest: String, cur_off: float,
 		return false
 	# Двигаться только в сторону dest, не назад
 	if fwd and target_off <= cur_off + 5.0:
+		print("[DEBUG] road click rejected: backward (", dest, ")")
 		return false
 	if not fwd and target_off >= cur_off - 5.0:
+		print("[DEBUG] road click rejected: backward (", dest, ")")
 		return false
 	if not _is_road_point_visible(closest):
+		print("[DEBUG] road click rejected: in fog (", dest,
+			" d_hero=", snapped(hero.global_position.distance_to(closest), 1.0), ")")
 		return false
 
 	# Зафиксировать активную дорогу — прибытие обновит offset/active
