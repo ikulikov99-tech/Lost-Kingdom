@@ -88,9 +88,8 @@ const ARRIVAL_RADIUS   := 60.0
 # Обобщает прежний _cv_offset на любую Path2D-дорогу.
 var _road_active: bool   = false   # true = герой стоит на дороге, не в локации
 var _road_path:   Path2D = null    # активная Path2D
-var _road_dest:   String = ""      # локация на дальнем конце дороги
-var _road_fwd:    bool   = true    # true = движение к увеличению offset кривой
-var _road_offset: float  = 0.0     # текущее смещение героя вдоль кривой (native)
+var _road_dest:   String = ""      # пункт назначения текущего шага (sosed или назад)
+var _road_offset: float  = 0.0     # смещение героя вдоль кривой на последней остановке
 
 # ──────────────── Инициализация ──────────────────────────────────
 func _ready() -> void:
@@ -309,15 +308,13 @@ func _route_path_for(a: String, b: String) -> Path2D:
 	return by_key.get(key, null)
 
 ## Клик по видимому участку дороги. Возвращает true если движение запущено.
+## Каждый клик оценивает ВСЕ дороги текущей локации от фактической позиции
+## героя — игрок не заперт на текущем Path2D и может развернуться/сменить ветку
+## через общий узел (развилку). current_location — это узел-развилка: пока
+## герой на дороге, current_location остаётся последней посещённой локацией,
+## а её ROUTES дают все ветки развилки.
 func _try_road_click(world_pos: Vector2) -> bool:
-	# Уже на дороге — продолжаем только по ней
-	if _road_active:
-		return _start_road_move(_road_path, _road_dest, _road_offset, _road_fwd, world_pos)
-
-	# В локации — выбираем ближайшую Path2D-дорогу к соседу
-	var best_path: Path2D = null
-	var best_dest := ""
-	var best_d := ROAD_CLICK_DIST
+	var candidates: Array = []   # [{d, path, nbr}]
 	for n: String in ROUTES[current_location]:
 		var p := _route_path_for(current_location, n)
 		if p == null:
@@ -327,44 +324,45 @@ func _try_road_click(world_pos: Vector2) -> bool:
 			continue
 		var cp := p.curve.get_closest_point(world_pos)
 		var d := world_pos.distance_to(cp)
-		if d < best_d:
-			best_d = d
-			best_path = p
-			best_dest = n
-	if best_path == null:
-		return false
+		if d < ROAD_CLICK_DIST:
+			candidates.append({"d": d, "path": p, "nbr": n})
+	candidates.sort_custom(func(a, b): return (a["d"] as float) < (b["d"] as float))
 
-	var start_off := best_path.curve.get_closest_offset(_pos(current_location))
-	var dest_off  := best_path.curve.get_closest_offset(_pos(best_dest))
-	return _start_road_move(best_path, best_dest, start_off, dest_off > start_off, world_pos)
+	for c: Dictionary in candidates:
+		if _start_road_move(c["path"], c["nbr"], world_pos):
+			return true
+	return false
 
-## Запускает частичное движение по дороге к точке клика (только вперёд к dest).
-func _start_road_move(path: Path2D, dest: String, cur_off: float,
-		fwd: bool, world_pos: Vector2) -> bool:
+## Движение по дороге к точке клика. Направление и пункт назначения берутся
+## из фактической позиции героя: к соседу nbr или назад к current_location —
+## смотря в какую сторону клик. Реверс и смена ветки больше не блокируются.
+func _start_road_move(path: Path2D, nbr: String, world_pos: Vector2) -> bool:
 	var curve := path.curve
-	var closest    := curve.get_closest_point(world_pos)
-	var target_off := curve.get_closest_offset(world_pos)
-
+	var closest := curve.get_closest_point(world_pos)
 	if world_pos.distance_to(closest) > ROAD_CLICK_DIST:
 		return false
-	# Двигаться только в сторону dest, не назад
-	if fwd and target_off <= cur_off + 5.0:
-		print("[DEBUG] road click rejected: backward (", dest, ")")
-		return false
-	if not fwd and target_off >= cur_off - 5.0:
-		print("[DEBUG] road click rejected: backward (", dest, ")")
-		return false
 	if not _is_road_point_visible(closest):
-		print("[DEBUG] road click rejected: in fog (", dest,
+		print("[DEBUG] road click rejected: in fog (", nbr,
 			" d_hero=", snapped(hero.global_position.distance_to(closest), 1.0), ")")
 		return false
 
-	# Зафиксировать активную дорогу — прибытие обновит offset/active
+	var hero_off   := curve.get_closest_offset(hero.global_position)
+	var target_off := curve.get_closest_offset(world_pos)
+	if absf(target_off - hero_off) < 5.0:
+		return false   # клик там, где герой уже стоит
+
+	# dest = конец дороги в сторону клика. nbr_off/loc_off задают ориентацию
+	# кривой; если клик в сторону current_location — идём назад к ней.
+	var loc_off := curve.get_closest_offset(_pos(current_location))
+	var nbr_off := curve.get_closest_offset(_pos(nbr))
+	var dest := nbr
+	if (target_off - hero_off) * (nbr_off - loc_off) < 0.0:
+		dest = current_location
+
 	_road_path = path
 	_road_dest = dest
-	_road_fwd  = fwd
 	_last_trail_pos = hero.global_position
-	hero.move_along_path("_road_", _build_partial_path(path, cur_off, target_off))
+	hero.move_along_path("_road_", _build_partial_path(path, hero_off, target_off))
 	return true
 
 ## Проверяет, попадает ли точка в открытую зону тумана.
