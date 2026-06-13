@@ -347,10 +347,6 @@ func _start_road_move(path: Path2D, nbr: String, world_pos: Vector2) -> bool:
 	var closest := path.to_global(curve.get_closest_point(lp))
 	if world_pos.distance_to(closest) > ROAD_CLICK_DIST:
 		return false
-	if not _is_road_point_visible(closest):
-		print("[DEBUG] road click rejected: in fog (", nbr,
-			" d_hero=", snapped(hero.global_position.distance_to(closest), 1.0), ")")
-		return false
 
 	var hero_off   := curve.get_closest_offset(path.to_local(hero.global_position))
 	var target_off := curve.get_closest_offset(lp)
@@ -364,6 +360,14 @@ func _start_road_move(path: Path2D, nbr: String, world_pos: Vector2) -> bool:
 	var dest := nbr
 	if (target_off - hero_off) * (nbr_off - loc_off) < 0.0:
 		dest = current_location
+
+	# Туман-гейт только для НЕоткрытых пунктов назначения. Дорога между двумя
+	# discovered-локациями уже исследована (trail/reveal) — клик свободен на
+	# всю длину. К неоткрытой локации сквозь глубокий туман кликать нельзя.
+	if not (discovered.get(dest, false) as bool) and not _is_road_point_visible(closest):
+		print("[DEBUG] road click rejected: in fog (", dest,
+			" d_hero=", snapped(hero.global_position.distance_to(closest), 1.0), ")")
+		return false
 
 	_road_path = path
 	_road_dest = dest
