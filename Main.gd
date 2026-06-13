@@ -276,17 +276,18 @@ func _build_waypoint_path(from_id: String, to_id: String) -> Array[Vector2]:
 ## forward=true: from_id→to_id, false: to_id→from_id
 func _sample_path(path: Path2D, from_id: String, to_id: String, forward: bool) -> Array[Vector2]:
 	var pts: Array[Vector2] = []
+	# baked-точки в локальном пространстве узла → переводим в global
 	var baked := path.curve.get_baked_points()  # PackedVector2Array
 	if forward:
 		pts.append(_pos(from_id))
 		for i in range(1, baked.size() - 1):
-			pts.append(baked[i])
+			pts.append(path.to_global(baked[i]))
 		pts.append(_pos(to_id))
 	else:
 		pts.append(_pos(to_id))
 		var i := baked.size() - 2
 		while i > 0:
-			pts.append(baked[i])
+			pts.append(path.to_global(baked[i]))
 			i -= 1
 		pts.append(_pos(from_id))
 	return pts
@@ -322,8 +323,10 @@ func _try_road_click(world_pos: Vector2) -> bool:
 		# Сосед должен быть кликабелен (available/discovered), скрытые — нельзя
 		if not (available.get(n, false) as bool) and not (discovered.get(n, false) as bool):
 			continue
-		var cp := p.curve.get_closest_point(world_pos)
-		var d := world_pos.distance_to(cp)
+		# curve в локальном пространстве узла — клик переводим в local
+		var lp := p.to_local(world_pos)
+		var cp := p.curve.get_closest_point(lp)
+		var d := lp.distance_to(cp)
 		if d < ROAD_CLICK_DIST:
 			candidates.append({"d": d, "path": p, "nbr": n})
 	candidates.sort_custom(func(a, b): return (a["d"] as float) < (b["d"] as float))
@@ -338,7 +341,10 @@ func _try_road_click(world_pos: Vector2) -> bool:
 ## смотря в какую сторону клик. Реверс и смена ветки больше не блокируются.
 func _start_road_move(path: Path2D, nbr: String, world_pos: Vector2) -> bool:
 	var curve := path.curve
-	var closest := curve.get_closest_point(world_pos)
+	# Все запросы к curve — в локальном пространстве узла (path.position может
+	# быть ≠ 0). Точки наружу (видимость, движение) возвращаем в global.
+	var lp := path.to_local(world_pos)
+	var closest := path.to_global(curve.get_closest_point(lp))
 	if world_pos.distance_to(closest) > ROAD_CLICK_DIST:
 		return false
 	if not _is_road_point_visible(closest):
@@ -346,15 +352,15 @@ func _start_road_move(path: Path2D, nbr: String, world_pos: Vector2) -> bool:
 			" d_hero=", snapped(hero.global_position.distance_to(closest), 1.0), ")")
 		return false
 
-	var hero_off   := curve.get_closest_offset(hero.global_position)
-	var target_off := curve.get_closest_offset(world_pos)
+	var hero_off   := curve.get_closest_offset(path.to_local(hero.global_position))
+	var target_off := curve.get_closest_offset(lp)
 	if absf(target_off - hero_off) < 5.0:
 		return false   # клик там, где герой уже стоит
 
 	# dest = конец дороги в сторону клика. nbr_off/loc_off задают ориентацию
 	# кривой; если клик в сторону current_location — идём назад к ней.
-	var loc_off := curve.get_closest_offset(_pos(current_location))
-	var nbr_off := curve.get_closest_offset(_pos(nbr))
+	var loc_off := curve.get_closest_offset(path.to_local(_pos(current_location)))
+	var nbr_off := curve.get_closest_offset(path.to_local(_pos(nbr)))
 	var dest := nbr
 	if (target_off - hero_off) * (nbr_off - loc_off) < 0.0:
 		dest = current_location
@@ -386,18 +392,19 @@ func _build_partial_path(path: Path2D, from_off: float, to_off: float) -> Array[
 	var hi    := maxf(from_off, to_off)
 	var pts: Array[Vector2] = []
 
-	pts.append(curve.sample_baked(from_off))
+	# Точки кривой локальные → герою отдаём global через path.to_global
+	pts.append(path.to_global(curve.sample_baked(from_off)))
 	if to_off >= from_off:
 		for i in range(1, n - 1):
 			var po := float(i) / float(n - 1) * total
 			if po > lo and po < hi:
-				pts.append(baked[i])
+				pts.append(path.to_global(baked[i]))
 	else:
 		for i in range(n - 2, 0, -1):
 			var po := float(i) / float(n - 1) * total
 			if po > lo and po < hi:
-				pts.append(baked[i])
-	pts.append(curve.sample_baked(to_off))
+				pts.append(path.to_global(baked[i]))
+	pts.append(path.to_global(curve.sample_baked(to_off)))
 	return pts
 
 func _exit_tree() -> void:
@@ -412,7 +419,8 @@ func _on_hero_arrived(location_name: String) -> void:
 	if location_name == "_road_":
 		# Остановка посреди дороги, не в локации
 		_road_active = true
-		_road_offset = _road_path.curve.get_closest_offset(hero.global_position)
+		_road_offset = _road_path.curve.get_closest_offset(
+			_road_path.to_local(hero.global_position))
 		# Если герой достаточно близко к dest — открываем локацию
 		if hero.global_position.distance_to(_pos(_road_dest)) < ARRIVAL_RADIUS:
 			_arrive_at_location(_road_dest)
@@ -503,7 +511,8 @@ func _draw_roads() -> void:
 				if route_path.curve != null:
 					var baked := route_path.curve.get_baked_points()
 					for i in range(baked.size() - 1):
-						draw_line(baked[i], baked[i + 1], col, 4.0)
+						draw_line(route_path.to_global(baked[i]),
+							route_path.to_global(baked[i + 1]), col, 4.0)
 				continue
 
 			var pts := _build_waypoint_path(a, b)
