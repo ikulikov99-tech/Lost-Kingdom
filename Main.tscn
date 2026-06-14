@@ -115,6 +115,7 @@ script = ExtResource("3_hero")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Hero" unique_id=921539905]
 scale = Vector2(0.45, 0.45)
+offset = Vector2(0, -59)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Hero" unique_id=1555877070]
 position = Vector2(0, 16)
