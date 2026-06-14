@@ -33,6 +33,15 @@ const WAYPOINTS := {
 	"Mine":            {"title": "Заброшенная шахта",   "pos": Vector2(-392,  -832)},
 }
 
+# Центр раскрытия тумана для локаций, у которых waypoint стоит на ВХОДЕ с
+# дороги, а не в центре картинки. Герой приходит к waypoint (точка движения
+# не двигается), но туман раскрывается вокруг reveal-центра — вся локация и
+# табличка выходят из тумана. Для остальных локаций reveal = waypoint.
+const REVEAL_CENTERS := {
+	"KnightRuins": Vector2(-648, -288),   # тело руин правее входа (-816,-296)
+	"Dock":        Vector2(-1112, -160),  # причал выше-правее угла (-1160,-128)
+}
+
 const ROUTES := {
 	"Castle":          ["Village"],
 	"Village":         ["Castle", "Dock", "Lumbermill"],
@@ -117,7 +126,7 @@ func _ready() -> void:
 		hero.arrived.connect(_on_hero_arrived)
 
 	# Туман: только Castle
-	fog_overlay.reveal(_pos("Castle"))
+	fog_overlay.reveal(_reveal_pos("Castle"))
 
 	_push_camera_to_fog()
 	_update_ui()
@@ -127,6 +136,8 @@ func _ready() -> void:
 # ──────────────── Вспомогательные ────────────────────────────────
 func _pos(id: String)   -> Vector2: return WAYPOINTS[id]["pos"]
 func _title(id: String) -> String:  return WAYPOINTS[id]["title"]
+## Центр раскрытия тумана локации: reveal-центр если задан, иначе waypoint.
+func _reveal_pos(id: String) -> Vector2: return REVEAL_CENTERS.get(id, _pos(id))
 
 ## Точная позиция центра экрана в мировых координатах.
 ## camera.get_screen_center_position() учитывает zoom и limits Camera2D.
@@ -383,7 +394,7 @@ func _is_road_point_visible(point: Vector2) -> bool:
 	if hero.global_position.distance_to(point) < HERO_VISIBLE_R:
 		return true
 	for id in discovered.keys():
-		if (discovered[id] as bool) and _pos(id).distance_to(point) < ROAD_VISIBLE_R:
+		if (discovered[id] as bool) and _reveal_pos(id).distance_to(point) < ROAD_VISIBLE_R:
 			return true
 	return false
 
@@ -447,7 +458,7 @@ func _arrive_at_location(location_name: String) -> void:
 	_road_offset = 0.0
 
 	discovered[location_name] = true
-	fog_overlay.reveal(_pos(location_name))
+	fog_overlay.reveal(_reveal_pos(location_name))
 	fog_overlay.clear_trail()
 	_last_trail_pos = Vector2(-99999.0, -99999.0)
 
