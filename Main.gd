@@ -13,17 +13,19 @@ extends Node2D
 # Path2D маршруты (HeroFollower не используется в runtime)
 @onready var _cv_path: Path2D = $CastleVillagePath
 @onready var _vd_path: Path2D = $VillageDockPath
-@onready var _vr_path: Path2D = $VillageRuinsPath
 @onready var _vl_path: Path2D = $VillageLumbermillPath
 @onready var _km_path: Path2D = $KnightRuinsMageTowerPath
 @onready var _ke_path: Path2D = $KnightRuinsEarthMagePath
+@onready var _dk_path: Path2D = $DockKnightRuinsPath
+# VillageRuinsPath оставлен в сцене как неиспользуемый узел (ручные точки
+# сохранены), но отключён от логики: маршрут к Руинам теперь Dock->KnightRuins.
 
 # ──────────────── Координаты ─────────────────────────────────────
 const WAYPOINTS := {
 	"Castle":          {"title": "Королевский замок",  "pos": Vector2(-1112, -704)},
 	"Village":         {"title": "Деревня",             "pos": Vector2(-928,  -504)},
 	"Dock":            {"title": "Пристань",            "pos": Vector2(-1160, -128)},
-	"KnightRuins":     {"title": "Руины рыцарей",       "pos": Vector2(-648,  -288)},
+	"KnightRuins":     {"title": "Руины рыцарей",       "pos": Vector2(-816,  -296)},
 	"MageTower":       {"title": "Башня мага",          "pos": Vector2(-560,  -320)},
 	"EarthMageCastle": {"title": "Замок мага земли",    "pos": Vector2(-464,  -488)},
 	"DarkCastle":      {"title": "Замок тьмы",          "pos": Vector2(-376,  -568)},
@@ -33,9 +35,9 @@ const WAYPOINTS := {
 
 const ROUTES := {
 	"Castle":          ["Village"],
-	"Village":         ["Castle", "Dock", "KnightRuins", "Lumbermill"],
-	"Dock":            ["Village"],
-	"KnightRuins":     ["Village", "MageTower", "EarthMageCastle"],
+	"Village":         ["Castle", "Dock", "Lumbermill"],
+	"Dock":            ["Village", "KnightRuins"],
+	"KnightRuins":     ["Dock", "MageTower", "EarthMageCastle"],
 	"MageTower":       ["KnightRuins"],
 	"EarthMageCastle": ["KnightRuins", "DarkCastle", "Mine"],
 	"DarkCastle":      ["EarthMageCastle"],
@@ -234,10 +236,10 @@ func _try_move_to(id: String) -> void:
 	   (current_location == "Dock" and id == "Village"):
 		hero.move_along_path(id, _sample_path(_vd_path, "Village", "Dock", current_location == "Village"))
 		return
-	# Village↔KnightRuins
-	if (current_location == "Village" and id == "KnightRuins") or \
-	   (current_location == "KnightRuins" and id == "Village"):
-		hero.move_along_path(id, _sample_path(_vr_path, "Village", "KnightRuins", current_location == "Village"))
+	# Dock↔KnightRuins (новый маршрут к Руинам через Пристань)
+	if (current_location == "Dock" and id == "KnightRuins") or \
+	   (current_location == "KnightRuins" and id == "Dock"):
+		hero.move_along_path(id, _sample_path(_dk_path, "Dock", "KnightRuins", current_location == "Dock"))
 		return
 	# Village↔Lumbermill
 	if (current_location == "Village" and id == "Lumbermill") or \
@@ -301,7 +303,7 @@ func _route_path_for(a: String, b: String) -> Path2D:
 	var by_key := {
 		"Castle-Village":              _cv_path,
 		"Dock-Village":                _vd_path,
-		"KnightRuins-Village":         _vr_path,
+		"Dock-KnightRuins":            _dk_path,
 		"Lumbermill-Village":          _vl_path,
 		"KnightRuins-MageTower":       _km_path,
 		"EarthMageCastle-KnightRuins": _ke_path,
@@ -502,8 +504,8 @@ func _draw_roads() -> void:
 				route_path = _cv_path
 			elif (a == "Dock" and b == "Village") or (a == "Village" and b == "Dock"):
 				route_path = _vd_path
-			elif (a == "KnightRuins" and b == "Village") or (a == "Village" and b == "KnightRuins"):
-				route_path = _vr_path
+			elif (a == "KnightRuins" and b == "Dock") or (a == "Dock" and b == "KnightRuins"):
+				route_path = _dk_path
 			elif (a == "Lumbermill" and b == "Village") or (a == "Village" and b == "Lumbermill"):
 				route_path = _vl_path
 			elif (a == "KnightRuins" and b == "MageTower") or (a == "MageTower" and b == "KnightRuins"):

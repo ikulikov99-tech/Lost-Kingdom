@@ -1,45 +1,63 @@
 [gd_scene format=3 uid="uid://bxkr3wyjwiun5"]
 
-[ext_resource type="Texture2D" uid="uid://dr06sragmd1ub" path="res://maps/world_map.png" id="1_map"]
+[ext_resource type="Texture2D" uid="uid://b116j5qqhgjwq" path="res://maps/world_map.png" id="1_map"]
 [ext_resource type="Script" uid="uid://bbjafr1t2bajt" path="res://Main.gd" id="2_main"]
 [ext_resource type="Script" uid="uid://bre52ru3sknwq" path="res://Hero.gd" id="3_hero"]
 [ext_resource type="Script" uid="uid://dd6hmgvhhbf3l" path="res://FogOverlay.gd" id="4_fog"]
 
 [sub_resource type="Curve2D" id="Curve2D_castle_village"]
 _data = {
-"points": PackedVector2Array(-30.400002, -41.6, 30.400002, 41.6, -1112, -704, 0, 0, 0, 0, -1095.3032, -679.8502, 0, 0, 0, 0, -1064, -648, 0, 0, 0, 0, -1024, -632, 0, 0, 0, 0, -960, -616, 0, 0, 0, 0, -928, -600, 0, 0, 0, 0, -904, -584, 0, 0, 0, 0, -896, -576, 0, 0, 0, 0, -880, -560, 0, 0, 0, 0, -872, -536, 0, 0, 0, 0, -864, -520, 0, 0, 0, 0, -872, -504, 0, 0, 0, 0, -888, -488, 0, 0, 0, 0, -912, -488, -20.000002, -10.400004, 20.000002, 10.400004, -936, -504)
+"points": PackedVector2Array(-30.400002, -41.6, 0, 0, -1112, -704, 0, 0, 0, 0, -1095.3032, -679.8502, 0, 0, 0, 0, -1064, -648, 0, 0, 0, 0, -1024, -632, 0, 0, 0, 0, -960, -616, 0, 0, 0, 0, -904, -584, 0, 0, 0, 0, -880, -560, 0, 0, 0, 0, -864, -536, 0, 0, 0, 0, -872, -504, 0, 0, 0, 0, -888, -488, 0, 0, 0, 0, -912, -488, -20.000002, -10.400004, 20.000002, 10.400004, -936, -504)
 }
-point_count = 15
+point_count = 12
 
 [sub_resource type="Curve2D" id="Curve2D_village_dock"]
 _data = {
-"points": PackedVector2Array(0, 0, 0, 0, -928, -504, 0, 0, 0, 0, -904, -488, 0, 0, 0, 0, -904, -472, 0, 0, 0, 0, -920, -456, 0, 0, 0, 0, -944, -440, 0, 0, 0, 0, -1000, -432, 0, 0, 0, 0, -1016, -424, 0, 0, 0, 0, -1016, -400, 0, 0, 0, 0, -984, -376, 0, 0, 0, 0, -960, -360, 0, 0, 0, 0, -944, -344, 0, 0, 0, 0, -928, -328, 0, 0, 0, 0, -928, -312, 0, 0, 0, 0, -936, -288, 0, 0, 0, 0, -920, -264, 0, 0, 0, 0, -904, -240, 0, 0, 0, 0, -920, -216, 0, 0, 0, 0, -952, -208, 0, 0, 0, 0, -984, -176, 0, 0, 0, 0, -1024, -144, 0, 0, 0, 0, -1080, -128, 0, 0, 0, 0, -1160, -128, 0, 0, 0, 0, -1160, -128)
+"points": PackedVector2Array(0, 0, 0, 0, -928, -504, 0, 0, 0, 0, -904, -488, 0, 0, 0, 0, -920, -456, 0, 0, 0, 0, -944, -440, 0, 0, 0, 0, -984, -432, 0, 0, 0, 0, -1016, -424, 0, 0, 0, 0, -1016, -400, 0, 0, 0, 0, -984, -376, 0, 0, 0, 0, -944, -344, 0, 0, 0, 0, -928, -320, 0, 0, 0, 0, -936, -288, 0, 0, 0, 0, -920, -264, 0, 0, 0, 0, -904, -240, 0, 0, 0, 0, -920, -216, 0, 0, 0, 0, -952, -208, 0, 0, 0, 0, -984, -176, 0, 0, 0, 0, -1024, -144, 0, 0, 0, 0, -1080, -128, 0, 0, 0, 0, -1160, -128, 0, 0, 0, 0, -1160, -128)
 }
-point_count = 23
+point_count = 20
 
 [sub_resource type="Curve2D" id="Curve2D_village_ruins"]
 _data = {
-"points": PackedVector2Array(0, 0, 0, 0, -928, -504, 0, 0, 0, 0, -896, -480, 0, 0, 0, 0, -952, -440, 0, 0, 0, 0, -1008, -432, 0, 0, 0, 0, -1016, -408, 0, 0, 0, 0, -1000, -384, 0, 0, 0, 0, -968, -368, 0, 0, 0, 0, -928, -328, 0, 0, 0, 0, -936, -288, 0, 0, 0, 0, -904, -256, 0, 0, 0, 0, -888, -232, 0, 0, 0, 0, -848, -232, 0, 0, 0, 0, -784, -224, 0, 0, 0, 0, -736, -240, 0, 0, 0, 0, -712, -256, 0, 0, 0, 0, -683.3023, -269.4503, 0, 0, 0, 0, -648, -288)
+"points": PackedVector2Array(0, 0, 0, 0, -821.92645, -488, 0, 0, 0, 0, -849.6512, -456, 0, 0, 0, 0, -891.23846, -448, 0, 0, 0, 0, -932.8256, -440, 0, 0, 0, 0, -1008, -432, 0, 0, 0, 0, -1016, -408, 0, 0, 0, 0, -974.4129, -384, 0, 0, 0, 0, -918.9632, -360, 0, 0, 0, 0, -863.5136, -328, 0, 0, 0, 0, -863.5136, -288, 0, 0, 0, 0, -849.6512, -264, 0, 0, 0, 0, -821.92645, -248, 0, 0, 0, 0, -808.064, -240, 0, 0, 0, 0, -784, -224, 0, 0, 0, 0, -736, -240, 0, 0, 0, 0, -712, -256, 0, 0, 0, 0, -669.44, -296)
 }
 point_count = 17
 
 [sub_resource type="Curve2D" id="Curve2D_village_lumbermill"]
 _data = {
-"points": PackedVector2Array(0, 0, 0, 0, -928, -504, 0, 0, 0, 0, -832, -608, 0, 0, 0, 0, -736, -688, 0, 0, 0, 0, -640, -752)
+"points": PackedVector2Array(0, 0, 0, 0, -896.82764, -488, 0, 0, 0, 0, -879.1724, -530.24, 0, 0, 0, 0, -852.6897, -540.80005, 0, 0, 0, 0, -799.7242, -583.04004, 0, 0, 0, 0, -755.58624, -614.72003, 0, 0, 0, 0, -702.6207, -635.84, 0, 0, 0, 0, -656, -688, 0, 0, 0, 0, -632, -720, 0, 0, 0, 0, -632, -741.44)
 }
-point_count = 4
+point_count = 9
+
+[sub_resource type="Curve2D" id="Curve2D_lumbermill_mine"]
+_data = {
+"points": PackedVector2Array(0, 0, 0, 0, -640, -752, 0, 0, 0, 0, -608, -736, 0, 0, 0, 0, -560, -736, 0, 0, 0, 0, -536, -752, 0, 0, 0, 0, -496, -760, 0, 0, 0, 0, -472, -776, 0, 0, 0, 0, -440, -792, 0, 0, 0, 0, -408, -808, 0, 0, 0, 0, -384, -832)
+}
+point_count = 9
 
 [sub_resource type="Curve2D" id="Curve2D_knightruins_magetower"]
 _data = {
-"points": PackedVector2Array(0, 0, 0, 0, -648, -288, 0, 0, 0, 0, -604, -304, 0, 0, 0, 0, -560, -320)
+"points": PackedVector2Array(0, 0, 0, 0, -636.6909, -283.11795, 0, 0, 0, 0, -640.41626, -272.77948, 0, 0, 0, 0, -634.82825, -271.0564, 0, 0, 0, 0, -629.1172, -269.33334, 0, 0, 0, 0, -623.49554, -270.88892, 0, 0, 0, 0, -614.3387, -274.50256, 0, 0, 0, 0, -606.88794, -277.94873, 0, 0, 0, 0, -597.5745, -283.11795, 0, 0, 0, 0, -584.5357, -284.84103, 0, 0, 0, 0, -582.27026, -275.5556)
 }
-point_count = 3
+point_count = 10
 
 [sub_resource type="Curve2D" id="Curve2D_knightruins_earthmage"]
 _data = {
-"points": PackedVector2Array(0, 0, 0, 0, -648, -288, 0, 0, 0, 0, -576, -376, 0, 0, 0, 0, -512, -440, 0, 0, 0, 0, -464, -488)
+"points": PackedVector2Array(0, 0, 0, 0, -816, -296, 0, 0, 0, 0, -744, -294, 0, 0, 0, 0, -688, -288, 0, 0, 0, 0, -640, -280, 0, 0, 0, 0, -600, -296, 0, 0, 0, 0, -568, -312, 0, 0, 0, 0, -560, -336, 0, 0, 0, 0, -544, -352, 0, 0, 0, 0, -536, -368, 0, 0, 0, 0, -528, -400, 0, 0, 0, 0, -536, -424, 0, 0, 0, 0, -512, -448, 0, 0, 0, 0, -488, -480, 0, 0, 0, 0, -456, -496, 0, 0, 0, 0, -416, -536, 0, 0, 0, 0, -408, -584, 0, 0, 0, 0, -432, -600, 0, 0, 0, 0, -456, -608)
 }
-point_count = 4
+point_count = 18
+
+[sub_resource type="Curve2D" id="Curve2D_earthmage_darkcastle"]
+_data = {
+"points": PackedVector2Array(0, 0, 0, 0, 193.81345, 46.150116, 0, 0, 0, 0, 197.40372, 20.083282, 0, 0, 0, 0, 200.99399, -5.98349, 0, 0, 0, 0, 238.86942, -28.559845, 0, 0, 0, 0, 311, -44)
+}
+point_count = 5
+
+[sub_resource type="Curve2D" id="Curve2D_dock_knightruins"]
+_data = {
+"points": PackedVector2Array(0, 0, 0, 0, -1160, -128, 0, 0, 0, 0, -1112, -160, 0, 0, 0, 0, -1056, -192, 0, 0, 0, 0, -992, -216, 0, 0, 0, 0, -928, -240, 0, 0, 0, 0, -880, -264, 0, 0, 0, 0, -840, -284, 0, 0, 0, 0, -816, -296)
+}
+point_count = 8
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_hero"]
 size = Vector2(28, 40)
@@ -48,7 +66,7 @@ size = Vector2(28, 40)
 script = ExtResource("2_main")
 
 [node name="WorldMap" type="Sprite2D" parent="." unique_id=1439782452]
-position = Vector2(-687, -547)
+position = Vector2(-672, -552)
 texture = ExtResource("1_map")
 
 [node name="CastleVillagePath" type="Path2D" parent="." unique_id=307424321]
@@ -62,16 +80,34 @@ rotates = false
 curve = SubResource("Curve2D_village_dock")
 
 [node name="VillageRuinsPath" type="Path2D" parent="." unique_id=408531201]
+position = Vector2(-429.6659, 0)
+scale = Vector2(0.57710046, 1)
 curve = SubResource("Curve2D_village_ruins")
 
 [node name="VillageLumbermillPath" type="Path2D" parent="." unique_id=408531202]
+position = Vector2(-51.25, -190.30304)
+scale = Vector2(0.90625, 0.75757575)
 curve = SubResource("Curve2D_village_lumbermill")
 
+[node name="LumbermillMinePath" type="Path2D" parent="." unique_id=408531205]
+curve = SubResource("Curve2D_lumbermill_mine")
+
 [node name="KnightRuinsMageTowerPath" type="Path2D" parent="." unique_id=408531203]
+position = Vector2(1918.5079, 1026.4753)
+scale = Vector2(4.294875, 4.642854)
 curve = SubResource("Curve2D_knightruins_magetower")
 
 [node name="KnightRuinsEarthMagePath" type="Path2D" parent="." unique_id=408531204]
 curve = SubResource("Curve2D_knightruins_earthmage")
+
+[node name="DockKnightRuinsPath" type="Path2D" parent="." unique_id=408531207]
+curve = SubResource("Curve2D_dock_knightruins")
+
+[node name="EarthMageDarkCastlePath" type="Path2D" parent="." unique_id=408531206]
+position = Vector2(-27.87334, -785.95966)
+rotation = -2.9879441
+scale = Vector2(0.4968881, 1.563411)
+curve = SubResource("Curve2D_earthmage_darkcastle")
 
 [node name="Hero" type="CharacterBody2D" parent="." unique_id=253898775]
 position = Vector2(-1112, -704)
@@ -107,6 +143,8 @@ script = ExtResource("4_fog")
 transparent_bg = true
 handle_input_locally = false
 gui_disable_input = true
+size = Vector2i(1280, 720)
+render_target_update_mode = 4
 
 [node name="FogBase" type="ColorRect" parent="UI/FogOverlay/FogViewport" unique_id=2074669521]
 anchors_preset = 15
