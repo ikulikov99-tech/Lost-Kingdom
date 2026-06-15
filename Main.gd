@@ -45,7 +45,7 @@ const REVEAL_CENTERS := {
 	"Dock":            Vector2(-1222, -127),
 	"KnightRuins":     Vector2(-702, -308),
 	"MageTower":       Vector2(-530, -246),
-	"EarthMageCastle": Vector2(-540, -505),  # дальше от DarkCastle (-376,-568)
+	"EarthMageCastle": Vector2(-560, -470),  # кроет замок, но ~208px от DarkCastle (прячет его)
 	"Lumbermill":      Vector2(-610, -778),
 }
 
