@@ -45,7 +45,7 @@ const REVEAL_CENTERS := {
 	"Dock":            Vector2(-1222, -127),
 	"KnightRuins":     Vector2(-702, -308),
 	"MageTower":       Vector2(-530, -246),
-	"EarthMageCastle": Vector2(-515, -521),
+	"EarthMageCastle": Vector2(-540, -505),  # дальше от DarkCastle (-376,-568)
 	"Lumbermill":      Vector2(-610, -778),
 }
 
@@ -389,6 +389,14 @@ func _start_road_move(path: Path2D, a: String, b: String, world_pos: Vector2) ->
 		print("[DEBUG] road click rejected: in fog (", dest,
 			" d_hero=", snapped(hero.global_position.distance_to(closest), 1.0), ")")
 		return false
+
+	# Если клик у самого конца дороги (в пределах ARRIVAL_RADIUS по дуге) —
+	# дотягиваем до точного конца Path2D, чтобы прибытие сработало в реальной
+	# точке локации, а не на 60px раньше («раннее открытие»). Клик дальше от
+	# конца остаётся обычной остановкой посреди дороги (без прибытия).
+	var dest_end_off := a_off if dest == a else b_off
+	if absf(target_off - dest_end_off) < ARRIVAL_RADIUS:
+		target_off = dest_end_off
 
 	_road_path = path
 	_road_dest = dest
