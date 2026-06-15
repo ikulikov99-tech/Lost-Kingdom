@@ -42,11 +42,11 @@ const WAYPOINTS := {
 # реветь раскрывал и место героя, и саму постройку с табличкой. Оценено по
 # world_map.png (1672x941, узел -672,-552, centered).
 const REVEAL_CENTERS := {
-	"Dock":            Vector2(-1222, -127),
-	"KnightRuins":     Vector2(-702, -308),
-	"MageTower":       Vector2(-530, -246),
-	"EarthMageCastle": Vector2(-560, -470),  # кроет замок, но ~208px от DarkCastle (прячет его)
-	"Lumbermill":      Vector2(-610, -778),
+	"Dock":            Vector2(-1250, -145),
+	"KnightRuins":     Vector2(-700, -330),
+	"MageTower":       Vector2(-530, -265),
+	"EarthMageCastle": Vector2(-600, -600),  # на замок; ~226px от DarkCastle (-376,-568) — прячет его
+	"Lumbermill":      Vector2(-615, -795),
 }
 
 const ROUTES := {

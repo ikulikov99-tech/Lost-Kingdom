@@ -77,14 +77,17 @@ Waypoint = точка движения/прибытия героя. **Не дв�
 
 | Локация | Reveal center |
 |---|---|
-| Dock | (-1222, -127) |
-| KnightRuins | (-702, -308) |
-| MageTower | (-530, -246) |
-| EarthMageCastle | (-515, -521) |
-| Lumbermill | (-610, -778) |
+| Dock | (-1250, -145) |
+| KnightRuins | (-700, -330) |
+| MageTower | (-530, -265) |
+| EarthMageCastle | (-600, -600) |
+| Lumbermill | (-615, -795) |
 
-Центры = середина между waypoint и зданием (оценено по world_map.png
-1672×941, узел -672,-552, centered). Раскрывают и место героя, и постройку.
+Центры смещены к зданиям/табличкам (waypoints стоят на въездах, а постройки
+смещены на карте). EarthMage — на замок и ~226px от DarkCastle (прячет его).
+Известное ограничение: единый reveal_r~135 не всегда полностью кроет крупную
+постройку+табличку; полное покрытие требует per-location reveal radius
+(правка FogOverlay/шейдера — НЕ цвет) — ждёт подтверждения.
 
 `_reveal_pos(id)` = REVEAL_CENTERS если задан, иначе waypoint.
 `_arrive_at_location`, стартовый Castle-reveal и `_is_road_point_visible` используют reveal-центр.
