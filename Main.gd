@@ -244,38 +244,22 @@ func _try_move_to(id: String) -> void:
 	_last_trail_pos = hero.global_position
 	on_route_event(current_location, id)
 
-	# Маршруты через Path2D — Castle↔Village
-	if (current_location == "Castle" and id == "Village") or \
-	   (current_location == "Village" and id == "Castle"):
-		hero.move_along_path(id, _sample_path(_cv_path, "Castle", "Village", current_location == "Castle"))
-		return
-	# Village↔Dock
-	if (current_location == "Village" and id == "Dock") or \
-	   (current_location == "Dock" and id == "Village"):
-		hero.move_along_path(id, _sample_path(_vd_path, "Village", "Dock", current_location == "Village"))
-		return
-	# Dock↔KnightRuins (новый маршрут к Руинам через Пристань)
-	if (current_location == "Dock" and id == "KnightRuins") or \
-	   (current_location == "KnightRuins" and id == "Dock"):
-		hero.move_along_path(id, _sample_path(_dk_path, "Dock", "KnightRuins", current_location == "Dock"))
-		return
-	# Village↔Lumbermill
-	if (current_location == "Village" and id == "Lumbermill") or \
-	   (current_location == "Lumbermill" and id == "Village"):
-		hero.move_along_path(id, _sample_path(_vl_path, "Village", "Lumbermill", current_location == "Village"))
-		return
-	# KnightRuins↔MageTower
-	if (current_location == "KnightRuins" and id == "MageTower") or \
-	   (current_location == "MageTower" and id == "KnightRuins"):
-		hero.move_along_path(id, _sample_path(_km_path, "KnightRuins", "MageTower", current_location == "KnightRuins"))
-		return
-	# KnightRuins↔EarthMageCastle
-	if (current_location == "KnightRuins" and id == "EarthMageCastle") or \
-	   (current_location == "EarthMageCastle" and id == "KnightRuins"):
-		hero.move_along_path(id, _sample_path(_ke_path, "KnightRuins", "EarthMageCastle", current_location == "KnightRuins"))
+	# Если для пары есть Path2D — ВСЕГДА идём по кривой (даже при icon-клике),
+	# чтобы герой не срезал углы прямой линией.
+	var p := _route_path_for(current_location, id)
+	if p != null:
+		# Ориентация: где старт кривой — у current_location или у id
+		var baked := p.curve.get_baked_points()
+		var s := p.to_global(baked[0])
+		if s.distance_to(_pos(current_location)) <= s.distance_to(_pos(id)):
+			hero.move_along_path(id, _sample_path(p, current_location, id, true))
+		else:
+			hero.move_along_path(id, _sample_path(p, id, current_location, false))
 		return
 
-	# Остальные маршруты — промежуточные точки
+	# Fallback (прямая/ROAD_PATHS) — ТОЛЬКО для маршрутов без Path2D
+	print("[DEBUG] no Path2D for ", current_location, "->", id,
+		" — fallback direct/ROAD_PATHS")
 	hero.move_along_path(id, _build_waypoint_path(current_location, id))
 
 ## Путь через промежуточные точки (не Path2D маршруты)
@@ -462,8 +446,13 @@ func _on_hero_arrived(location_name: String) -> void:
 		_road_active = true
 		_road_offset = _road_path.curve.get_closest_offset(
 			_road_path.to_local(hero.global_position))
-		# Если герой достаточно близко к dest — открываем локацию
-		if hero.global_position.distance_to(_pos(_road_dest)) < ARRIVAL_RADIUS:
+		# Прибытие только когда герой реально у КОНЦА дороги (dest), а не просто
+		# прошёл рядом с waypoint: проверяем И по прямой, И по дуге кривой.
+		var dest_off := _road_path.curve.get_closest_offset(
+			_road_path.to_local(_pos(_road_dest)))
+		var near_xy := hero.global_position.distance_to(_pos(_road_dest)) < ARRIVAL_RADIUS
+		var near_arc := absf(_road_offset - dest_off) < ARRIVAL_RADIUS
+		if near_xy and near_arc:
 			_arrive_at_location(_road_dest)
 		else:
 			_debug_state("road_stop %s off=%s" % [_road_dest, str(snapped(_road_offset, 0.1))])
@@ -483,7 +472,8 @@ func _arrive_at_location(location_name: String) -> void:
 
 	discovered[location_name] = true
 	fog_overlay.reveal(_reveal_pos(location_name))
-	fog_overlay.clear_trail()
+	# Trail НЕ очищаем при прибытии — последние точки FIFO держат недавно
+	# пройденную дорогу частично открытой (баг: дорога зарастала туманом).
 	_last_trail_pos = Vector2(-99999.0, -99999.0)
 
 	for neighbor in ROUTES[location_name]:
