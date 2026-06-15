@@ -19,8 +19,11 @@ uniform float time     = 0.0;
 // ── Герой ──
 uniform vec2  hero_pos      = vec2(-99999.0, -99999.0);
 // Маленький live-круг вокруг героя при движении (полное раскрытие локации —
-// только при прибытии через rp*). 160 -> 80 -> 65.
-uniform float hero_reveal_r = 65.0;
+// только при прибытии через rp*). 160 -> 80 -> 65 -> 50.
+uniform float hero_reveal_r = 50.0;
+// Смещение центра live-круга вверх, чтобы свет не лез вниз/вперёд к зданиям
+// (на старте у Замка — не задевал Деревню снизу).
+uniform vec2  hero_reveal_offset = vec2(0.0, -35.0);
 
 // ── Trail (FIFO 8 точек) ──
 uniform int  trail_count = 0;
@@ -93,7 +96,7 @@ void fragment() {
     if (trail_count > 6) min_trail_d = min(min_trail_d, distance(world_pos, tp6));
     if (trail_count > 7) min_trail_d = min(min_trail_d, distance(world_pos, tp7));
 
-    float hero_d = distance(world_pos, hero_pos);
+    float hero_d = distance(world_pos, hero_pos + hero_reveal_offset);
 
     float r_loc    = reveal_r + edge_n * edge_amp;
     float fog_loc  = smoothstep(r_loc - edge_soft, r_loc + edge_soft, min_loc_d);
