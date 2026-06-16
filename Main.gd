@@ -82,6 +82,14 @@ var discovered: Dictionary      = {}   # id -> bool
 # available: доступны для клика (соседи текущей), но туман не открыт
 var available: Dictionary       = {}   # id -> bool
 
+# Gate: локации, закрытые до будущей механики выхода из шахты (подземелья).
+# Ребро/ROAD_PATHS к DarkCastle существует, но навигация туда запрещена,
+# пока _mine_exit_done = false. Подземелье НЕ реализуется здесь — только gate.
+const LOCKED_UNTIL_MINE_EXIT := ["DarkCastle"]
+var _mine_exit_done: bool = false
+func _is_locked(id: String) -> bool:
+	return not _mine_exit_done and LOCKED_UNTIL_MINE_EXIT.has(id)
+
 # Trail: расстояние между точками пути (px). При hero_reveal_r=160 и edge=40
 # перекрытие между соседними точками начинается с dist < 240. Шаг 110 даёт
 # надёжный overlap без лишних точек (8 точек × 110px = 880px покрытия).
@@ -230,6 +238,8 @@ func _find_any_waypoint(mpos: Vector2, radius: float) -> String:
 	return best
 
 func _is_accessible(id: String) -> bool:
+	# Закрыто до выхода из шахты — навигация туда запрещена
+	if _is_locked(id):                       return false
 	# Можно кликнуть если локация available (или discovered) и является соседом текущей
 	if not (available.get(id, false) as bool) and not (discovered.get(id, false) as bool):
 		return false
@@ -379,6 +389,9 @@ func _start_road_move(path: Path2D, a: String, b: String, world_pos: Vector2) ->
 	else:
 		dest = a if a_off < b_off else b
 
+	# Закрыто до выхода из шахты — навигация туда запрещена
+	if _is_locked(dest):
+		return false
 	# Скрытую (не available и не discovered) локацию выбирать нельзя
 	if not (available.get(dest, false) as bool) and not (discovered.get(dest, false) as bool):
 		return false
@@ -485,6 +498,8 @@ func _arrive_at_location(location_name: String) -> void:
 	_last_trail_pos = Vector2(-99999.0, -99999.0)
 
 	for neighbor in ROUTES[location_name]:
+		if _is_locked(neighbor):
+			continue   # gated до выхода из шахты — не делаем кликабельным
 		available[neighbor] = true
 
 	GameState.unlocked_locations = _get_discovered_list()
