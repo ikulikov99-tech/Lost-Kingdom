@@ -67,8 +67,9 @@ func _draw() -> void:
 	var locked: Array = _main.LOCKED_UNTIL_MINE_EXIT
 
 	# 3. Waypoints + LOCKED + подписи + кольцо location reveal_r
+	# Позиции берём через _main._pos(id) — показываем актуальные Marker2D.
 	for id: String in wp.keys():
-		var wpos: Vector2 = wp[id]["pos"]
+		var wpos: Vector2 = _main._pos(id)
 		var sp := _w2s(wpos)
 		var is_locked := locked.has(id)
 		var col := Color(1.0, 0.3, 0.3, 1.0) if is_locked else Color(0.3, 0.8, 1.0, 1.0)
@@ -80,13 +81,13 @@ func _draw() -> void:
 			label += "  [LOCKED]"
 		draw_string(font, sp + Vector2(9, -8), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, col)
 
-	# 4. REVEAL_CENTERS — оранжевые маркеры + связь с waypoint + кольцо reveal_r
+	# 4. REVEAL_CENTERS — оранжевые маркеры (через _main._reveal_pos) + связь
 	for id: String in rc.keys():
-		var cpos: Vector2 = rc[id]
+		var cpos: Vector2 = _main._reveal_pos(id)
 		var sc := _w2s(cpos)
 		var oc := Color(1.0, 0.6, 0.0, 1.0)
 		if wp.has(id):
-			draw_line(_w2s(wp[id]["pos"]), sc, Color(1.0, 0.6, 0.0, 0.55), 1.0)
+			draw_line(_w2s(_main._pos(id)), sc, Color(1.0, 0.6, 0.0, 0.55), 1.0)
 		draw_circle(sc, 4.0, oc)
 		draw_arc(sc, REVEAL_R * zoom, 0.0, TAU, 48, Color(1.0, 0.6, 0.0, 0.4), 1.5)
 		draw_string(font, sc + Vector2(6, 12), "rc " + id, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, oc)
@@ -101,14 +102,13 @@ func _draw() -> void:
 	draw_line(hs, hc, Color(1.0, 1.0, 0.0, 0.6), 1.0)
 	draw_circle(hs, 5.0, Color(1.0, 1.0, 1.0, 1.0))
 
-	# 7. Текущий target/маршрут
-	var tgt: String = ""
-	if bool(_main._road_active):
-		tgt = str(_main._road_dest)
-	elif hero.is_moving:
-		tgt = str(_main.hero.target_location)
-	if tgt != "" and wp.has(tgt):
-		draw_line(hs, _w2s(wp[tgt]["pos"]), Color(1.0, 0.0, 1.0, 0.8), 2.0)
+	# 7. Target-line к ФАКТИЧЕСКОЙ точке движения (Main.get_debug_target_position):
+	# road-click → спроецированная точка на дороге, icon-click → waypoint.
+	# _road_dest здесь не используется (он только для arrival-проверки).
+	if hero.is_moving or bool(_main._road_active):
+		var tp: Vector2 = _main.get_debug_target_position()
+		draw_line(hs, _w2s(tp), Color(1.0, 0.0, 1.0, 0.8), 2.0)
+		draw_circle(_w2s(tp), 4.0, Color(1.0, 0.0, 1.0, 0.9))
 
 	# Легенда
 	var legend := "[F3] жёлт=road  фиол=disabled  оранж=reveal  зел=trail_r  жёлт.круг=hero"

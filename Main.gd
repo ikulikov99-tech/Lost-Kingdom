@@ -26,7 +26,7 @@ const WAYPOINTS := {
 	"Castle":          {"title": "Королевский замок",  "pos": Vector2(-1112, -704)},
 	"Village":         {"title": "Деревня",             "pos": Vector2(-928,  -504)},
 	"Dock":            {"title": "Пристань",            "pos": Vector2(-1160, -128)},
-	"KnightRuins":     {"title": "Руины рыцарей",       "pos": Vector2(-816,  -296)},
+	"KnightRuins":     {"title": "Руины рыцарей",       "pos": Vector2(-792,  -288)},
 	"MageTower":       {"title": "Башня мага",          "pos": Vector2(-560,  -320)},
 	"EarthMageCastle": {"title": "Замок мага земли",    "pos": Vector2(-464,  -488)},
 	"DarkCastle":      {"title": "Замок тьмы",          "pos": Vector2(-376,  -568)},
@@ -53,9 +53,9 @@ const ROUTES := {
 	"Castle":          ["Village"],
 	"Village":         ["Castle", "Dock", "Lumbermill"],
 	"Dock":            ["Village", "KnightRuins"],
-	"KnightRuins":     ["Dock", "MageTower", "EarthMageCastle"],
-	"MageTower":       ["KnightRuins"],
-	"EarthMageCastle": ["KnightRuins", "DarkCastle", "Mine"],
+	"KnightRuins":     ["Dock", "MageTower"],
+	"MageTower":       ["KnightRuins", "EarthMageCastle"],
+	"EarthMageCastle": ["MageTower", "DarkCastle", "Mine"],
 	"DarkCastle":      ["EarthMageCastle"],
 	"Lumbermill":      ["Village", "Mine"],
 	"Mine":            ["Lumbermill", "EarthMageCastle"],
@@ -109,6 +109,15 @@ const ROAD_VISIBLE_R   := 210.0
 const HERO_VISIBLE_R   := 110.0
 # Расстояние до вейпоинта чтобы засчитать прибытие
 const ARRIVAL_RADIUS   := 60.0
+# Direction-click: герой шагает по дороге в сторону клика, целиться в линию точно
+# не надо. ROAD_CLICK_STEP — максимум шага за клик (px по длине кривой),
+# MIN_ROAD_STEP — минимум; реальный шаг = к проекции клика на дорогу (короткий шаг
+# «по свету»). DIR_TOLERANCE_DEG — допуск угла: дорогу выбираем по направлению от
+# героя к локации-соседу, ближайшему к направлению клика (разные локации — разные
+# направления, поэтому развилка различается, даже если дороги идут рядом).
+const ROAD_CLICK_STEP   := 220.0
+const MIN_ROAD_STEP     := 40.0
+const DIR_TOLERANCE_DEG := 75.0
 
 # Состояние «герой остановился посреди дороги, не в локации».
 # Обобщает прежний _cv_offset на любую Path2D-дорогу.
@@ -116,12 +125,20 @@ var _road_active: bool   = false   # true = герой стоит на доро�
 var _road_path:   Path2D = null    # активная Path2D
 var _road_dest:   String = ""      # пункт назначения текущего шага (sosed или назад)
 var _road_offset: float  = 0.0     # смещение героя вдоль кривой на последней остановке
+var _road_target_off: float = 0.0  # целевая точка road-click на кривой
+
+# Визуальная настройка карты: Marker2D в Main.tscn под MapTuningMarkers.
+# Если маркер есть — берём его global_position; иначе fallback на константы
+# WAYPOINTS / REVEAL_CENTERS. Кэшируются в _ready.
+var _wp_markers: Dictionary = {}   # id -> Marker2D/Node2D
+var _rc_markers: Dictionary = {}   # id -> Marker2D/Node2D
 
 # ──────────────── Инициализация ──────────────────────────────────
 func _ready() -> void:
 	# Кривая Castle<->Village загружается из Main.tscn (Curve2D_castle_village).
 	# Для редактирования: выдели CastleVillagePath в сцене и двигай точки мышью.
 
+	_cache_markers()
 	current_location = "Castle"
 	GameState.current_location = "Castle"
 
@@ -149,10 +166,31 @@ func _ready() -> void:
 	queue_redraw()
 
 # ──────────────── Вспомогательные ────────────────────────────────
-func _pos(id: String)   -> Vector2: return WAYPOINTS[id]["pos"]
+## Waypoint движения: позиция Marker2D из редактора если есть, иначе константа.
+func _pos(id: String) -> Vector2:
+	if _wp_markers.has(id):
+		return (_wp_markers[id] as Node2D).global_position
+	return WAYPOINTS[id]["pos"]
+
 func _title(id: String) -> String:  return WAYPOINTS[id]["title"]
-## Центр раскрытия тумана локации: reveal-центр если задан, иначе waypoint.
-func _reveal_pos(id: String) -> Vector2: return REVEAL_CENTERS.get(id, _pos(id))
+
+## Центр раскрытия тумана локации: Marker2D из редактора если есть, иначе
+## константа REVEAL_CENTERS, иначе сам waypoint.
+func _reveal_pos(id: String) -> Vector2:
+	if _rc_markers.has(id):
+		return (_rc_markers[id] as Node2D).global_position
+	return REVEAL_CENTERS.get(id, _pos(id))
+
+## Кэширует Marker2D-узлы настройки карты (MapTuningMarkers/*). Вызывается в _ready.
+func _cache_markers() -> void:
+	var wnode := get_node_or_null("MapTuningMarkers/Waypoints")
+	if wnode != null:
+		for c in wnode.get_children():
+			_wp_markers[c.name] = c
+	var rnode := get_node_or_null("MapTuningMarkers/RevealCenters")
+	if rnode != null:
+		for c in rnode.get_children():
+			_rc_markers[c.name] = c
 
 ## Точная позиция центра экрана в мировых координатах.
 ## camera.get_screen_center_position() учитывает zoom и limits Camera2D.
@@ -172,26 +210,19 @@ func _input(event: InputEvent) -> void:
 			return
 		var world_pos := get_global_mouse_position()
 
-		# Новая механика: клик по видимому участку любой Path2D-дороги
+		# 1) Клик прямо по иконке доступной локации — идём к ней целиком.
+		#    Скрытую в тумане локацию по иконке не пускаем (её не видно).
+		if not _road_active:
+			var clicked := _find_accessible_waypoint(world_pos)
+			if clicked != "" and ((discovered.get(clicked, false) as bool) \
+					or _is_road_point_visible(_pos(clicked))):
+				_try_move_to(clicked)
+				return
+
+		# 2) Direction-click: герой идёт по дороге, лучше всего совпадающей с
+		#    направлением клика от героя (целиться в линию не нужно).
 		if _try_road_click(world_pos):
 			return
-
-		# Посреди дороги работают только клики по самой дороге —
-		# иначе _try_move_to построит путь от исходной локации (телепорт назад)
-		if _road_active:
-			return
-
-		# Fallback: клик по иконке локации (ROAD_PATHS-маршруты, обратный путь)
-		var clicked := _find_accessible_waypoint(world_pos)
-		if clicked == "":
-			return
-		# Неоткрытая локация с Path2D-дорогой достижима только исследованием
-		# дороги — слепой клик по иконке сквозь туман не пускаем
-		if not (discovered.get(clicked, false) as bool) \
-				and _route_path_for(current_location, clicked) != null \
-				and not _is_road_point_visible(_pos(clicked)):
-			return
-		_try_move_to(clicked)
 
 func _physics_process(_delta: float) -> void:
 	_push_camera_to_fog()
@@ -318,7 +349,7 @@ func _route_path_for(a: String, b: String) -> Path2D:
 		"Dock-KnightRuins":            _dk_path,
 		"Lumbermill-Village":          _vl_path,
 		"KnightRuins-MageTower":       _km_path,
-		"EarthMageCastle-KnightRuins": _ke_path,
+		"EarthMageCastle-MageTower":   _ke_path,
 		"Lumbermill-Mine":             _lm_path,
 	}
 	return by_key.get(key, null)
@@ -328,91 +359,87 @@ func _route_path_for(a: String, b: String) -> Path2D:
 const ROUTED_PAIRS := [
 	["Castle", "Village"], ["Village", "Dock"], ["Dock", "KnightRuins"],
 	["Village", "Lumbermill"], ["Lumbermill", "Mine"],
-	["KnightRuins", "MageTower"], ["KnightRuins", "EarthMageCastle"],
+	["KnightRuins", "MageTower"], ["MageTower", "EarthMageCastle"],
 ]
 
-## Клик по видимому участку дороги. Возвращает true если движение запущено.
-## Каждый клик оценивает ВСЕ дороги текущей локации от фактической позиции
-## героя — игрок не заперт на текущем Path2D и может развернуться/сменить ветку
-## через общий узел (развилку). current_location — это узел-развилка: пока
-## герой на дороге, current_location остаётся последней посещённой локацией,
-## а её ROUTES дают все ветки развилки.
+## Клик-исследование: кликаешь В СТОРОНУ, куда хочешь идти (в темноту тоже можно),
+## целиться в линию не нужно. Кандидаты — ВСЕ активные дороги, на кривой которых
+## герой СЕЙЧАС стоит (в пределах HERO_VISIBLE_R). На развилке он близок сразу к
+## нескольким дорогам — поэтому можно свернуть на любую из них по направлению
+## клика, не заходя в локацию-узел (оба конца дороги — кандидаты на dest, берём
+## тот, чьё направление от героя ближе к клику). disabled/фиолетовые и закрытые —
+## мимо. Шаг — к проекции клика («по свету»).
 func _try_road_click(world_pos: Vector2) -> bool:
-	# Кандидаты — ВСЕ Path2D-дороги, чья кривая близка к клику И к фактической
-	# позиции героя. Выбор не зависит от current_location, поэтому у общего узла
-	# (развилки) доступны все ветки, как только герой подошёл к узлу.
-	var candidates: Array = []   # [{d, path, a, b}]
+	var click_vec := world_pos - hero.global_position
+	if click_vec.length() < 1.0:
+		return false
+	var click_dir := click_vec.normalized()
+	var best_path: Path2D = null
+	var best_dest := ""
+	var best_dot := cos(deg_to_rad(DIR_TOLERANCE_DEG))
 	for pair: Array in ROUTED_PAIRS:
-		var a: String = pair[0]
-		var b: String = pair[1]
-		var p := _route_path_for(a, b)
+		var p := _route_path_for(pair[0], pair[1])
 		if p == null:
 			continue
-		var lp := p.to_local(world_pos)
-		var cp := p.curve.get_closest_point(lp)
-		var click_d := lp.distance_to(cp)
-		if click_d >= ROAD_CLICK_DIST:
-			continue
-		# Герой должен быть на этой дороге / у её узла (иначе нельзя «прыгнуть»)
+		# герой должен СЕЙЧАС стоять на этой дороге (иначе «прыгнуть» нельзя)
 		var hlp := p.to_local(hero.global_position)
 		if hlp.distance_to(p.curve.get_closest_point(hlp)) >= HERO_VISIBLE_R:
 			continue
-		candidates.append({"d": click_d, "path": p, "a": a, "b": b})
-	candidates.sort_custom(func(x, y): return (x["d"] as float) < (y["d"] as float))
-
-	for c: Dictionary in candidates:
-		if _start_road_move(c["path"], c["a"], c["b"], world_pos):
-			return true
-	return false
-
-## Движение по дороге a↔b к точке клика. Направление и dest берутся из
-## фактической позиции героя и стороны клика — current_location не участвует.
-func _start_road_move(path: Path2D, a: String, b: String, world_pos: Vector2) -> bool:
-	var curve := path.curve
-	# Все запросы к curve — в локальном пространстве узла (transform ≠ identity).
-	var lp := path.to_local(world_pos)
-	var closest := path.to_global(curve.get_closest_point(lp))
-	if world_pos.distance_to(closest) > ROAD_CLICK_DIST:
+		# оба конца — кандидаты; вперёд к соседу или назад к узлу решает клик
+		for dest: String in [str(pair[0]), str(pair[1])]:
+			if _is_locked(dest):
+				continue
+			if not (available.get(dest, false) as bool) and not (discovered.get(dest, false) as bool):
+				continue
+			var to_dest := _pos(dest) - hero.global_position
+			if to_dest.length() < 1.0:
+				continue   # герой уже у этого конца
+			var dot := click_dir.dot(to_dest.normalized())
+			if dot > best_dot:
+				best_dot = dot
+				best_path = p
+				best_dest = dest
+	if best_path == null:
 		return false
+	var curve := best_path.curve
+	var hero_off := curve.get_closest_offset(best_path.to_local(hero.global_position))
+	var dest_off := curve.get_closest_offset(best_path.to_local(_pos(best_dest)))
+	return _commit_road_move(best_path, best_dest, hero_off,
+		_step_target_click(best_path, hero_off, dest_off, world_pos))
 
-	var hero_off   := curve.get_closest_offset(path.to_local(hero.global_position))
-	var target_off := curve.get_closest_offset(lp)
+## Целевой offset шага: ведём к проекции клика на дорогу (короткий шаг «по свету»),
+## но не дальше ROAD_CLICK_STEP и не ближе MIN_ROAD_STEP. Snap к концу (→ прибытие)
+## ТОЛЬКО если игрок целит В конец дороги: клик у локации или за ней. Если клик не
+## доходит до конца — герой останавливается у клика, локация НЕ «захватывает»
+## (можно пройти мимо/свернуть на развилке).
+func _step_target_click(path: Path2D, hero_off: float, dest_off: float, world_pos: Vector2) -> float:
+	var curve := path.curve
+	var total := curve.get_baked_length()
+	var dir := signf(dest_off - hero_off)
+	var click_off := curve.get_closest_offset(path.to_local(world_pos))
+	var raw := click_off - hero_off
+	# дистанцию клика берём только если он в сторону dest, иначе минимальный шаг
+	var mag := absf(raw) if signf(raw) == dir else MIN_ROAD_STEP
+	mag = clampf(mag, MIN_ROAD_STEP, ROAD_CLICK_STEP)
+	var target_off := clampf(hero_off + dir * mag, 0.0, total)
+	# целит ли клик В конец: у конца (в пределах ARRIVAL_RADIUS) или ЗА ним
+	var aims_end := (dest_off - click_off) * dir <= ARRIVAL_RADIUS
+	if aims_end and absf(dest_off - target_off) < ARRIVAL_RADIUS:
+		target_off = dest_off
+	return target_off
+
+## Запускает движение по дороге к dest до target_off. fog/discovered-гейт НЕ
+## применяется: шаг ограничен ROAD_CLICK_STEP, к скрытой цели целиком не ведём.
+func _commit_road_move(path: Path2D, dest: String, hero_off: float, target_off: float) -> bool:
 	if absf(target_off - hero_off) < 5.0:
-		return false   # клик там, где герой уже стоит
-
-	# dest = конец дороги в сторону клика (по offset кривой)
-	var a_off := curve.get_closest_offset(path.to_local(_pos(a)))
-	var b_off := curve.get_closest_offset(path.to_local(_pos(b)))
-	var dest: String
-	if target_off > hero_off:
-		dest = a if a_off > b_off else b
-	else:
-		dest = a if a_off < b_off else b
-
-	# Закрыто до выхода из шахты — навигация туда запрещена
+		return false   # уже на месте
 	if _is_locked(dest):
 		return false
-	# Скрытую (не available и не discovered) локацию выбирать нельзя
 	if not (available.get(dest, false) as bool) and not (discovered.get(dest, false) as bool):
 		return false
-
-	# Туман-гейт только для НЕоткрытых пунктов назначения. Дорога между двумя
-	# discovered-локациями уже исследована — клик свободен на всю длину.
-	if not (discovered.get(dest, false) as bool) and not _is_road_point_visible(closest):
-		print("[DEBUG] road click rejected: in fog (", dest,
-			" d_hero=", snapped(hero.global_position.distance_to(closest), 1.0), ")")
-		return false
-
-	# Если клик у самого конца дороги (в пределах ARRIVAL_RADIUS по дуге) —
-	# дотягиваем до точного конца Path2D, чтобы прибытие сработало в реальной
-	# точке локации, а не на 60px раньше («раннее открытие»). Клик дальше от
-	# конца остаётся обычной остановкой посреди дороги (без прибытия).
-	var dest_end_off := a_off if dest == a else b_off
-	if absf(target_off - dest_end_off) < ARRIVAL_RADIUS:
-		target_off = dest_end_off
-
 	_road_path = path
 	_road_dest = dest
+	_road_target_off = target_off
 	_last_trail_pos = hero.global_position
 	hero.move_along_path("_road_", _build_partial_path(path, hero_off, target_off))
 	return true
@@ -453,6 +480,17 @@ func _build_partial_path(path: Path2D, from_off: float, to_off: float) -> Array[
 	pts.append(path.to_global(curve.sample_baked(to_off)))
 	return pts
 
+## Фактическая точка движения героя — для debug overlay target-line.
+## road-click: спроецированная точка на _road_path по _road_target_off
+## (НЕ endpoint-локация _road_dest). icon-click: waypoint цели. Иначе — позиция.
+## Только чтение, на игровую логику не влияет.
+func get_debug_target_position() -> Vector2:
+	if _road_path != null and (_road_active or hero.target_location == "_road_"):
+		return _road_path.to_global(_road_path.curve.sample_baked(_road_target_off))
+	if hero.is_moving and WAYPOINTS.has(hero.target_location):
+		return _pos(hero.target_location)
+	return hero.global_position
+
 func _exit_tree() -> void:
 	if hero != null and hero.arrived.is_connected(_on_hero_arrived):
 		hero.arrived.disconnect(_on_hero_arrived)
@@ -473,7 +511,13 @@ func _on_hero_arrived(location_name: String) -> void:
 			_road_path.to_local(_pos(_road_dest)))
 		var near_xy := hero.global_position.distance_to(_pos(_road_dest)) < ARRIVAL_RADIUS
 		var near_arc := absf(_road_offset - dest_off) < ARRIVAL_RADIUS
-		if near_xy and near_arc:
+		# dest — это всегда КОНЕЦ дороги (терминал кривой 0 или длина). Маркер
+		# локации может лежать в стороне от кривой (curve не дотягивает до него),
+		# тогда near_xy недостижим. Поэтому прибытие засчитываем и когда герой
+		# реально дошёл до терминала со стороны dest (near_arc + dest у конца).
+		var total := _road_path.curve.get_baked_length()
+		var dest_at_terminal := dest_off < ARRIVAL_RADIUS or absf(dest_off - total) < ARRIVAL_RADIUS
+		if near_arc and (near_xy or dest_at_terminal):
 			_arrive_at_location(_road_dest)
 		else:
 			_debug_state("road_stop %s off=%s" % [_road_dest, str(snapped(_road_offset, 0.1))])
@@ -490,6 +534,7 @@ func _arrive_at_location(location_name: String) -> void:
 	_road_path   = null
 	_road_dest   = ""
 	_road_offset = 0.0
+	_road_target_off = 0.0
 
 	discovered[location_name] = true
 	fog_overlay.reveal(_reveal_pos(location_name))

@@ -4,55 +4,55 @@
 [ext_resource type="Script" uid="uid://bbjafr1t2bajt" path="res://Main.gd" id="2_main"]
 [ext_resource type="Script" uid="uid://bre52ru3sknwq" path="res://Hero.gd" id="3_hero"]
 [ext_resource type="Script" uid="uid://dd6hmgvhhbf3l" path="res://FogOverlay.gd" id="4_fog"]
-[ext_resource type="Script" path="res://MapDebugOverlay.gd" id="5_dbg"]
+[ext_resource type="Script" uid="uid://7aqi5lbnb5mm" path="res://MapDebugOverlay.gd" id="5_dbg"]
 
 [sub_resource type="Curve2D" id="Curve2D_castle_village"]
 _data = {
-"points": PackedVector2Array(-30.400002, -41.6, 0, 0, -1104, -712, 0, 0, 0, 0, -1088, -688, 0, 0, 0, 0, -1064, -664, 0, 0, 0, 0, -1024, -640, 0, 0, 0, 0, -960, -624, 0, 0, 0, 0, -904, -600, 0, 0, 0, 0, -872, -576, 0, 0, 0, 0, -858.68256, -556.09357, 0, 0, 0, 0, -848, -536, 0, 0, 0, 0, -856, -504, 0, 0, 0, 0, -880, -488, 0, 0, 0, 0, -920, -512)
+"points": PackedVector2Array(-30.400002, -41.6, 0, 0, -1088, -720, 0, 0, 0, 0, -1072, -696, 0, 0, 0, 0, -1056, -672, 0, 0, 0, 0, -1024, -648, 0, 0, 0, 0, -992, -640, 0, 0, 0, 0, -960, -632, 0, 0, 0, 0, -920, -616, 0, 0, 0, 0, -888, -600, 0, 0, 0, 0, -856, -576, 0, 0, 0, 0, -840, -568, 0, 0, 0, 0, -832, -528, 0, 0, 0, 0, -856, -488, 0, 0, 0, 0, -872, -496, 0, 0, 0, 0, -888, -504)
 }
-point_count = 12
+point_count = 14
 
 [sub_resource type="Curve2D" id="Curve2D_village_dock"]
 _data = {
-"points": PackedVector2Array(0, 0, 0, 0, -912, -504, 0, 0, 0, 0, -888, -488, 0, 0, 0, 0, -904, -464, 0, 0, 0, 0, -944, -440, 0, 0, 0, 0, -984, -440, 0, 0, 0, 0, -1000, -424, 0, 0, 0, 0, -1000, -400, 0, 0, 0, 0, -968, -384, 0, 0, 0, 0, -928, -352, 0, 0, 0, 0, -912, -328, 0, 0, 0, 0, -920, -288, 0, 0, 0, 0, -904, -272, 0, 0, 0, 0, -888, -248, 0, 0, 0, 0, -896, -232, 0, 0, 0, 0, -920, -216, 0, 0, 0, 0, -952, -192, 0, 0, 0, 0, -984, -168, 0, 0, 0, 0, -1024, -144, 0, 0, 0, 0, -1080, -128, 0, 0, 0, 0, -1160, -128, 0, 0, 0, 0, -1160, -128)
+"points": PackedVector2Array(0, 0, 0, 0, -888, -504, 0, 0, 0, 0, -856, -488, 0, 0, 0, 0, -880, -464, 0, 0, 0, 0, -944, -440, 0, 0, 0, 0, -984, -432, 0, 0, 0, 0, -984, -408, 0, 0, 0, 0, -968, -384, 0, 0, 0, 0, -944, -376, 0, 0, 0, 0, -920, -360, 0, 0, 0, 0, -896, -328, 0, 0, 0, 0, -904, -296, 0, 0, 0, 0, -888, -272, 0, 0, 0, 0, -880, -248, 0, 0, 0, 0, -864, -240, 0, 0, 0, 0, -875.304, -233.83878, 0, 0, 0, 0, -912, -208, 0, 0, 0, 0, -944, -184, 0, 0, 0, 0, -976, -160, 0, 0, 0, 0, -1024, -136, 0, 0, 0, 0, -1080, -128, 0, 0, 0, 0, -1124.8961, -130.01959, 0, 0, 0, 0, -1160, -128, 0, 0, 0, 0, -1160, -128)
 }
-point_count = 21
+point_count = 23
 
 [sub_resource type="Curve2D" id="Curve2D_village_ruins"]
 _data = {
-"points": PackedVector2Array(0, 0, 0, 0, -794.2016, -488, 0, 0, 0, 0, -808.064, -472, 0, 0, 0, 0, -849.6512, -456, 0, 0, 0, 0, -891.23846, -448, 0, 0, 0, 0, -932.8256, -440, 0, 0, 0, 0, -988.2753, -432, 0, 0, 0, 0, -988.2753, -408, 0, 0, 0, 0, -974.4129, -392, 0, 0, 0, 0, -946.68805, -384, 0, 0, 0, 0, -905.1009, -368, 0, 0, 0, 0, -863.5136, -352, 0, 0, 0, 0, -835.7889, -328, 0, 0, 0, 0, -849.6512, -296, 0, 0, 0, 0, -821.92645, -272, 0, 0, 0, 0, -794.2016, -248, 0, 0, 0, 0, -794.2016, -232, 0, 0, 0, 0, -821.92645, -224, 0, 0, 0, 0, -736, -240, 0, 0, 0, 0, -683.3023, -256, 0, 0, 0, 0, -669.44, -296)
+"points": PackedVector2Array(0, 0, 0, 0, -888, -504, 0, 0, 0, 0, -888, -504, 0, 0, 0, 0, -856, -488, 0, 0, 0, 0, -880, -464, 0, 0, 0, 0, -896, -456, 0, 0, 0, 0, -932.8256, -440, 0, 0, 0, 0, -984, -432, 0, 0, 0, 0, -984, -408, 0, 0, 0, 0, -974.4129, -392, 0, 0, 0, 0, -944, -376, 0, 0, 0, 0, -920, -352, 0, 0, 0, 0, -896, -336, 0, 0, 0, 0, -904, -304, 0, 0, 0, 0, -896, -280, 0, 0, 0, 0, -880, -248, 0, 0, 0, 0, -864, -240, 0, 0, 0, 0, -824, -240, 0, 0, 0, 0, -808, -264, 0, 0, 0, 0, -792, -288)
 }
-point_count = 20
+point_count = 19
 
 [sub_resource type="Curve2D" id="Curve2D_village_lumbermill"]
 _data = {
-"points": PackedVector2Array(0, 0, 0, 0, -896.82764, -488, 0, 0, 0, 0, -879.1724, -509.12, 0, 0, 0, 0, -852.6897, -540.80005, 0, 0, 0, 0, -826.2069, -561.92004, 0, 0, 0, 0, -799.7242, -583.04004, 0, 0, 0, 0, -773.2414, -604.16003, 0, 0, 0, 0, -729.10345, -614.72003, 0, 0, 0, 0, -693.79315, -625.28, 0, 0, 0, 0, -667.31036, -646.4, 0, 0, 0, 0, -649.6552, -667.52, 0, 0, 0, 0, -649.6552, -688.64, 0, 0, 0, 0, -614.34485, -720.32, 0, 0, 0, 0, -632, -741.44)
-}
-point_count = 13
-
-[sub_resource type="Curve2D" id="Curve2D_lumbermill_mine"]
-_data = {
-"points": PackedVector2Array(0, 0, 0, 0, -632, -760, 0, 0, 0, 0, -608, -736, 0, 0, 0, 0, -560, -736, 0, 0, 0, 0, -536, -752, 0, 0, 0, 0, -496, -760, 0, 0, 0, 0, -472, -776, 0, 0, 0, 0, -456, -800, 0, 0, 0, 0, -430.13342, -803.72656, 0, 0, 0, 0, -408, -808, 0, 0, 0, 0, -384, -832)
-}
-point_count = 10
-
-[sub_resource type="Curve2D" id="Curve2D_knightruins_magetower"]
-_data = {
-"points": PackedVector2Array(0, 0, 0, 0, -636.6909, -283.11795, 0, 0, 0, 0, -640.41626, -272.77948, 0, 0, 0, 0, -634.82825, -271.0564, 0, 0, 0, 0, -629.2402, -269.3333, 0, 0, 0, 0, -623.49554, -270.88892, 0, 0, 0, 0, -614.3387, -274.50256, 0, 0, 0, 0, -606.88794, -277.94873, 0, 0, 0, 0, -597.5745, -283.11795, 0, 0, 0, 0, -584.5357, -284.84103, 0, 0, 0, 0, -580.81036, -281.39487, 0, 0, 0, 0, -582.27026, -275.5556)
+"points": PackedVector2Array(0, 0, 0, 0, -888, -504, 0, 0, 0, 0, -856, -488, 0, 0, 0, 0, -832, -528, 0, 0, 0, 0, -840, -568, 0, 0, 0, 0, -808, -600, 0, 0, 0, 0, -760, -632, 0, 0, 0, 0, -704, -656, 0, 0, 0, 0, -656, -672, 0, 0, 0, 0, -624, -696, 0, 0, 0, 0, -592, -736, 0, 0, 0, 0, -620, -764)
 }
 point_count = 11
 
+[sub_resource type="Curve2D" id="Curve2D_lumbermill_mine"]
+_data = {
+"points": PackedVector2Array(0, 0, 0, 0, -620, -764, 0, 0, 0, 0, -600, -744, 0, 0, 0, 0, -592, -736, 0, 0, 0, 0, -528, -744, 0, 0, 0, 0, -488, -760, 0, 0, 0, 0, -456, -776, 0, 0, 0, 0, -440, -792, 0, 0, 0, 0, -408, -808, 0, 0, 0, 0, -368, -824)
+}
+point_count = 9
+
+[sub_resource type="Curve2D" id="Curve2D_knightruins_magetower"]
+_data = {
+"points": PackedVector2Array(0, 0, 0, 0, -792, -288, 0, 0, 0, 0, -809.5148, -266.50775, 0, 0, 0, 0, -824, -248, 0, 0, 0, 0, -824, -240, 0, 0, 0, 0, -808, -232, 0, 0, 0, 0, -784, -224, 0, 0, 0, 0, -744, -232, 0, 0, 0, 0, -712, -248, 0, 0, 0, 0, -664, -280, 0, 0, 0, 0, -624, -296, 0, 0, 0, 0, -600, -296, 0, 0, 0, 0, -583.0817, -302.11252, 0, 0, 0, 0, -576, -304, 0, 0, 0, 0, -576, -304, 0, 0, 0, 0, -552, -268)
+}
+point_count = 15
+
 [sub_resource type="Curve2D" id="Curve2D_knightruins_earthmage"]
 _data = {
-"points": PackedVector2Array(0, 0, 0, 0, -816, -296, 0, 0, 0, 0, -816, -280, 0, 0, 0, 0, -832, -240, 0, 0, 0, 0, -808, -232, 0, 0, 0, 0, -776, -232, 0, 0, 0, 0, -728, -240, 0, 0, 0, 0, -694.31384, -258.48227, 0, 0, 0, 0, -656, -288, 0, 0, 0, 0, -624, -296, 0, 0, 0, 0, -600, -296, 0, 0, 0, 0, -568, -312, 0, 0, 0, 0, -544, -328, 0, 0, 0, 0, -544, -352, 0, 0, 0, 0, -520, -376, 0, 0, 0, 0, -512, -400, 0, 0, 0, 0, -528, -432, 0, 0, 0, 0, -512, -448, 0, 0, 0, 0, -488, -472, 0, 0, 0, 0, -456, -496, 0, 0, 0, 0, -424, -512, 0, 0, 0, 0, -392, -544, 0, 0, 0, 0, -392, -568, 0, 0, 0, 0, -408, -584, 0, 0, 0, 0, -432, -600, 0, 0, 0, 0, -456, -608)
+"points": PackedVector2Array(0, 0, 0, 0, -552, -268, 0, 0, 0, 0, -560, -280, 0, 0, 0, 0, -576, -304, 0, 0, 0, 0, -560, -312, 0, 0, 0, 0, -547.2144, -318.86038, 0, 0, 0, 0, -536, -328, 0, 0, 0, 0, -528, -352, 0, 0, 0, 0, -504, -376, 0, 0, 0, 0, -504, -408, 0, 0, 0, 0, -512, -432, 0, 0, 0, 0, -488, -456, 0, 0, 0, 0, -472, -480, 0, 0, 0, 0, -448, -496, 0, 0, 0, 0, -416, -504, 0, 0, 0, 0, -376, -552, 0, 0, 0, 0, -384, -576, 0, 0, 0, 0, -408, -592, 0, 0, 0, 0, -432, -600, 0, 0, 0, 0, -432, -600)
 }
-point_count = 25
+point_count = 19
 
 [sub_resource type="Curve2D" id="Curve2D_dock_knightruins"]
 _data = {
-"points": PackedVector2Array(0, 0, 0, 0, -1160, -128, 0, 0, 0, 0, -1080, -128, 0, 0, 0, 0, -1040, -136, 0, 0, 0, 0, -1000, -160, 0, 0, 0, 0, -952, -192, 0, 0, 0, 0, -896, -224, 0, 0, 0, 0, -864, -240, 0, 0, 0, 0, -832, -248, 0, 0, 0, 0, -816, -272, 0, 0, 0, 0, -816, -296)
+"points": PackedVector2Array(0, 0, 0, 0, -1160, -128, 0, 0, 0, 0, -1119.2961, -131.61957, 0, 0, 0, 0, -1080, -128, 0, 0, 0, 0, -1040, -136, 0, 0, 0, 0, -992, -152, 0, 0, 0, 0, -952, -176, 0, 0, 0, 0, -912, -208, 0, 0, 0, 0, -896, -224, 0, 0, 0, 0, -864, -240, 0, 0, 0, 0, -824, -240, 0, 0, 0, 0, -808, -272, 0, 0, 0, 0, -792, -288)
 }
-point_count = 10
+point_count = 12
 
 [sub_resource type="Curve2D" id="Curve2D_earthmage_darkcastle"]
 _data = {
@@ -67,35 +67,29 @@ size = Vector2(28, 40)
 script = ExtResource("2_main")
 
 [node name="WorldMap" type="Sprite2D" parent="." unique_id=1439782452]
-position = Vector2(-672, -552)
+position = Vector2(-656, -552)
 texture = ExtResource("1_map")
 
 [node name="CastleVillagePath" type="Path2D" parent="." unique_id=307424321]
 curve = SubResource("Curve2D_castle_village")
 
 [node name="HeroFollower" type="PathFollow2D" parent="CastleVillagePath" unique_id=1086056321]
-position = Vector2(-1104, -712)
+position = Vector2(-1088, -720)
 rotates = false
 
 [node name="VillageDockPath" type="Path2D" parent="." unique_id=408531200]
 curve = SubResource("Curve2D_village_dock")
 
 [node name="VillageRuinsPath" type="Path2D" parent="." unique_id=408531201]
-position = Vector2(-429.6659, 0)
-scale = Vector2(0.57710046, 1)
 curve = SubResource("Curve2D_village_ruins")
 
 [node name="VillageLumbermillPath" type="Path2D" parent="." unique_id=408531202]
-position = Vector2(-51.25, -190.30304)
-scale = Vector2(0.90625, 0.75757575)
 curve = SubResource("Curve2D_village_lumbermill")
 
 [node name="LumbermillMinePath" type="Path2D" parent="." unique_id=408531205]
 curve = SubResource("Curve2D_lumbermill_mine")
 
 [node name="KnightRuinsMageTowerPath" type="Path2D" parent="." unique_id=408531203]
-position = Vector2(1918.5079, 1026.4753)
-scale = Vector2(4.294875, 4.642854)
 curve = SubResource("Curve2D_knightruins_magetower")
 
 [node name="KnightRuinsEarthMagePath" type="Path2D" parent="." unique_id=408531204]
@@ -202,6 +196,7 @@ theme_override_font_sizes/font_size = 14
 layer = 128
 
 [node name="MapDebugOverlay" type="Control" parent="DebugLayer" unique_id=2074669998]
+layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -209,3 +204,63 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("5_dbg")
+
+[node name="MapTuningMarkers" type="Node2D" parent="." unique_id=415966724]
+
+[node name="Waypoints" type="Node2D" parent="MapTuningMarkers" unique_id=1420717469]
+
+[node name="Castle" type="Marker2D" parent="MapTuningMarkers/Waypoints" unique_id=1295412524]
+position = Vector2(-1088, -720)
+
+[node name="Village" type="Marker2D" parent="MapTuningMarkers/Waypoints" unique_id=1007312816]
+position = Vector2(-888, -504)
+
+[node name="Dock" type="Marker2D" parent="MapTuningMarkers/Waypoints" unique_id=63202753]
+position = Vector2(-1160, -128)
+
+[node name="KnightRuins" type="Marker2D" parent="MapTuningMarkers/Waypoints" unique_id=1129465724]
+position = Vector2(-792, -288)
+
+[node name="MageTower" type="Marker2D" parent="MapTuningMarkers/Waypoints" unique_id=1871843030]
+position = Vector2(-552, -272)
+
+[node name="EarthMageCastle" type="Marker2D" parent="MapTuningMarkers/Waypoints" unique_id=1548903745]
+position = Vector2(-432, -600)
+
+[node name="DarkCastle" type="Marker2D" parent="MapTuningMarkers/Waypoints" unique_id=34241022]
+position = Vector2(-176, -744)
+
+[node name="Lumbermill" type="Marker2D" parent="MapTuningMarkers/Waypoints" unique_id=944773762]
+position = Vector2(-624, -760)
+
+[node name="Mine" type="Marker2D" parent="MapTuningMarkers/Waypoints" unique_id=43909602]
+position = Vector2(-376, -816)
+
+[node name="RevealCenters" type="Node2D" parent="MapTuningMarkers" unique_id=616033787]
+
+[node name="Dock" type="Marker2D" parent="MapTuningMarkers/RevealCenters" unique_id=1792293479]
+position = Vector2(-1296, -192)
+
+[node name="KnightRuins" type="Marker2D" parent="MapTuningMarkers/RevealCenters" unique_id=505269912]
+position = Vector2(-704, -400)
+
+[node name="MageTower" type="Marker2D" parent="MapTuningMarkers/RevealCenters" unique_id=1633202513]
+position = Vector2(-496, -248)
+
+[node name="Lumbermill" type="Marker2D" parent="MapTuningMarkers/RevealCenters" unique_id=879065789]
+position = Vector2(-680, -832)
+
+[node name="EarthMageCastle" type="Marker2D" parent="MapTuningMarkers/RevealCenters" unique_id=1315371155]
+position = Vector2(-512, -624)
+
+[node name="Castle" type="Marker2D" parent="MapTuningMarkers/RevealCenters" unique_id=1695749405]
+position = Vector2(-1200, -816)
+
+[node name="Village" type="Marker2D" parent="MapTuningMarkers/RevealCenters" unique_id=2135692822]
+position = Vector2(-1016, -552)
+
+[node name="Mine" type="Marker2D" parent="MapTuningMarkers/RevealCenters" unique_id=1163443376]
+position = Vector2(-416, -944)
+
+[node name="DarkCastle" type="Marker2D" parent="MapTuningMarkers/RevealCenters" unique_id=1688494889]
+position = Vector2(-200, -640)
