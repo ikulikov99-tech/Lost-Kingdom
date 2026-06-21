@@ -118,6 +118,12 @@ const ARRIVAL_RADIUS   := 60.0
 const ROAD_CLICK_STEP   := 220.0
 const MIN_ROAD_STEP     := 40.0
 const DIR_TOLERANCE_DEG := 75.0
+# Свернуть на ДРУГУЮ дорогу (не ту, на которой герой стоит) можно только вплотную
+# к узлу — в пределах этого радиуса от её кривой. Иначе при переходе за 80px от
+# узла, где кривые уже разошлись, герой прыгал бы диагональю на чужую кривую (срез
+# угла). У узла кривые сходятся в общую точку → переход без среза. Безопасно только
+# вместе с _road_arrive_intended: дойдя до узла, герой НЕ входит в локацию.
+const JUNCTION_SWITCH_R := 50.0
 
 # Состояние «герой остановился посреди дороги, не в локации».
 # Обобщает прежний _cv_offset на любую Path2D-дорогу.
@@ -126,6 +132,11 @@ var _road_path:   Path2D = null    # активная Path2D
 var _road_dest:   String = ""      # пункт назначения текущего шага (sosed или назад)
 var _road_offset: float  = 0.0     # смещение героя вдоль кривой на последней остановке
 var _road_target_off: float = 0.0  # целевая точка road-click на кривой
+# Намерение войти в локацию: true только если клик был В саму локацию (рядом с
+# маркером). Если герой просто дошёл до конца кривой = узла развилки, но клик был
+# МИМО/ЗА локацию (хочет свернуть/пройти) — прибытие НЕ засчитываем, герой стоит
+# на узле в _road_active и может уйти на другую дорогу. Решает «затягивание лучом».
+var _road_arrive_intended: bool = false
 
 # Визуальная настройка карты: Marker2D в Main.tscn под MapTuningMarkers.
 # Если маркер есть — берём его global_position; иначе fallback на константы
@@ -210,18 +221,23 @@ func _input(event: InputEvent) -> void:
 			return
 		var world_pos := get_global_mouse_position()
 
-		# 1) Клик прямо по иконке доступной локации — идём к ней целиком.
-		#    Скрытую в тумане локацию по иконке не пускаем (её не видно).
-		if not _road_active:
-			var clicked := _find_accessible_waypoint(world_pos)
-			if clicked != "" and ((discovered.get(clicked, false) as bool) \
-					or _is_road_point_visible(_pos(clicked))):
-				_try_move_to(clicked)
-				return
-
-		# 2) Direction-click: герой идёт по дороге, лучше всего совпадающей с
-		#    направлением клика от героя (целиться в линию не нужно).
+		# 1) Direction-click ПРИОРИТЕТ: герой идёт по дороге, лучше всего совпадающей
+		#    с направлением клика. Сам обрабатывает проход/переход через узел и шаг
+		#    по дороге; ВХОД в локацию — только если клик в её endpoint (внутри
+		#    через _road_arrive_intended). Клик «дальше/вбок» от локации НЕ заводит
+		#    в неё — герой продолжает по дороге. Это убирает «засасывание» узлом.
 		if _try_road_click(world_pos):
+			return
+
+		# 2) Fallback — явный клик по иконке доступной видимой локации, которая НЕ
+		#    лежит на активной Path2D-дороге (маршруты ROAD_PATHS: Mine, DarkCastle).
+		#    Path2D-локации полностью покрыты direction-click'ом выше, поэтому сюда
+		#    дойдёт только клик прямо по такой иконке — это явное намерение войти.
+		#    Малый радиус, чтобы клик рядом (не по иконке) не засчитывался входом.
+		var clicked := _find_accessible_waypoint(world_pos, 45.0)
+		if clicked != "" and ((discovered.get(clicked, false) as bool) \
+				or _is_road_point_visible(_pos(clicked))):
+			_try_move_to(clicked)
 			return
 
 func _physics_process(_delta: float) -> void:
@@ -383,7 +399,11 @@ func _try_road_click(world_pos: Vector2) -> bool:
 			continue
 		# герой должен СЕЙЧАС стоять на этой дороге (иначе «прыгнуть» нельзя)
 		var hlp := p.to_local(hero.global_position)
-		if hlp.distance_to(p.curve.get_closest_point(hlp)) >= HERO_VISIBLE_R:
+		var d_curve := hlp.distance_to(p.curve.get_closest_point(hlp))
+		if d_curve >= HERO_VISIBLE_R:
+			continue
+		# на ДРУГУЮ дорогу — только у самого узла, где кривые сходятся (без среза)
+		if p != _road_path and d_curve >= JUNCTION_SWITCH_R:
 			continue
 		# оба конца — кандидаты; вперёд к соседу или назад к узлу решает клик
 		for dest: String in [str(pair[0]), str(pair[1])]:
@@ -404,8 +424,11 @@ func _try_road_click(world_pos: Vector2) -> bool:
 	var curve := best_path.curve
 	var hero_off := curve.get_closest_offset(best_path.to_local(hero.global_position))
 	var dest_off := curve.get_closest_offset(best_path.to_local(_pos(best_dest)))
+	# войти в локацию = только если клик целит В неё (рядом с маркером). Клик в
+	# сторону/за локацию = пройти узел или свернуть, без захвата локацией.
+	var arrive_intent := world_pos.distance_to(_pos(best_dest)) < ARRIVAL_RADIUS
 	return _commit_road_move(best_path, best_dest, hero_off,
-		_step_target_click(best_path, hero_off, dest_off, world_pos))
+		_step_target_click(best_path, hero_off, dest_off, world_pos), arrive_intent)
 
 ## Целевой offset шага: ведём к проекции клика на дорогу (короткий шаг «по свету»),
 ## но не дальше ROAD_CLICK_STEP и не ближе MIN_ROAD_STEP. Snap к концу (→ прибытие)
@@ -430,7 +453,8 @@ func _step_target_click(path: Path2D, hero_off: float, dest_off: float, world_po
 
 ## Запускает движение по дороге к dest до target_off. fog/discovered-гейт НЕ
 ## применяется: шаг ограничен ROAD_CLICK_STEP, к скрытой цели целиком не ведём.
-func _commit_road_move(path: Path2D, dest: String, hero_off: float, target_off: float) -> bool:
+func _commit_road_move(path: Path2D, dest: String, hero_off: float, target_off: float,
+		arrive_intent: bool = false) -> bool:
 	if absf(target_off - hero_off) < 5.0:
 		return false   # уже на месте
 	if _is_locked(dest):
@@ -440,6 +464,7 @@ func _commit_road_move(path: Path2D, dest: String, hero_off: float, target_off: 
 	_road_path = path
 	_road_dest = dest
 	_road_target_off = target_off
+	_road_arrive_intended = arrive_intent
 	_last_trail_pos = hero.global_position
 	hero.move_along_path("_road_", _build_partial_path(path, hero_off, target_off))
 	return true
@@ -517,7 +542,9 @@ func _on_hero_arrived(location_name: String) -> void:
 		# реально дошёл до терминала со стороны dest (near_arc + dest у конца).
 		var total := _road_path.curve.get_baked_length()
 		var dest_at_terminal := dest_off < ARRIVAL_RADIUS or absf(dest_off - total) < ARRIVAL_RADIUS
-		if near_arc and (near_xy or dest_at_terminal):
+		# Прибытие — только если клик ЦЕЛИЛ в локацию. Дошёл до узла-конца кривой,
+		# но клик был мимо/за локацию → стоим на узле (можно свернуть), без захвата.
+		if _road_arrive_intended and near_arc and (near_xy or dest_at_terminal):
 			_arrive_at_location(_road_dest)
 		else:
 			_debug_state("road_stop %s off=%s" % [_road_dest, str(snapped(_road_offset, 0.1))])
