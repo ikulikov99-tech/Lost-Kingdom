@@ -78,6 +78,33 @@ const ROAD_PATHS := {
 	],
 }
 
+# ──────────────── RoadGraph V2 (junction ≠ location) ─────────────
+# Phase 1: только данные + self-check. НЕ подключено к навигации.
+# Модель: Junction — дорожный узел (проезд action не запускает), Location —
+# иконка (вход только icon-click). Дорога = Path2D segment между junction-узлами.
+# В будущем encounters будут висеть на segment + offset. Junction-маркеры —
+# RoadGraph/Junctions/* в Main.tscn. Старая навигация пока работает как есть.
+const ROAD_JUNCTIONS := {
+	"CastleJunction":      "Castle",
+	"VillageJunction":     "Village",
+	"DockJunction":        "Dock",
+	"KnightRuinsJunction": "KnightRuins",
+	"MageTowerJunction":   "MageTower",
+	"EarthMageJunction":   "EarthMageCastle",
+	"LumbermillJunction":  "Lumbermill",
+	"MineJunction":        "Mine",
+	"DarkCastleJunction":  "DarkCastle",
+}
+
+# Тестовый маршрут V2: CastleJunction → VillageJunction → LumbermillJunction → MineJunction.
+# Формат: [from_junction, to_junction, path2d_node_name]. Path2D берутся из уже
+# существующих узлов сцены (НЕ создаём новые дороги в Phase 1).
+const ROAD_SEGMENTS_V2 := [
+	["CastleJunction",    "VillageJunction",    "CastleVillagePath"],
+	["VillageJunction",   "LumbermillJunction", "VillageLumbermillPath"],
+	["LumbermillJunction", "MineJunction",      "LumbermillMinePath"],
+]
+
 # ──────────────── Состояние ──────────────────────────────────────
 var current_location: String    = "Castle"
 # discovered: туман открыт, считается в счётчике "Открыто"
@@ -189,6 +216,7 @@ func _ready() -> void:
 	_push_camera_to_fog()
 	_update_ui()
 	_debug_state("_ready")
+	_verify_roadgraph_v2()
 	queue_redraw()
 
 # ──────────────── Вспомогательные ────────────────────────────────
@@ -217,6 +245,33 @@ func _cache_markers() -> void:
 	if rnode != null:
 		for c in rnode.get_children():
 			_rc_markers[c.name] = c
+
+## Phase 1 self-check RoadGraph V2: все junction-маркеры и тестовые Path2D на
+## месте. Ничего не меняет в навигации — только лог/предупреждения.
+func _verify_roadgraph_v2() -> void:
+	var jroot := get_node_or_null("RoadGraph/Junctions")
+	var ok_j := 0
+	var miss_j: Array[String] = []
+	for jname in ROAD_JUNCTIONS.keys():
+		if jroot != null and jroot.has_node(NodePath(jname)):
+			ok_j += 1
+		else:
+			miss_j.append(jname)
+	var ok_s := 0
+	var miss_s: Array[String] = []
+	for seg in ROAD_SEGMENTS_V2:
+		var path_name: String = seg[2]
+		var n := get_node_or_null(NodePath(path_name))
+		if n != null and n is Path2D:
+			ok_s += 1
+		else:
+			miss_s.append(path_name)
+	print("[ROADGRAPH_V2] ready junctions=%d/%d segments=%d/%d" \
+		% [ok_j, ROAD_JUNCTIONS.size(), ok_s, ROAD_SEGMENTS_V2.size()])
+	if not miss_j.is_empty():
+		push_warning("[ROADGRAPH_V2] missing junctions: %s" % ", ".join(miss_j))
+	if not miss_s.is_empty():
+		push_warning("[ROADGRAPH_V2] missing segment paths: %s" % ", ".join(miss_s))
 
 ## Точная позиция центра экрана в мировых координатах.
 ## camera.get_screen_center_position() учитывает zoom и limits Camera2D.
