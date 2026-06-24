@@ -1,5 +1,5 @@
 {
-  "note": "Generated from Main.tscn Curve2D _data + MapTuningMarkers. POS = curve points (world). baked_length is chord-length approx (curves are near-polyline, tangents ~0).",
+  "note": "Generated from Main.tscn Curve2D _data + MapTuningMarkers. POS = curve points (world). baked_length is chord-length approx. MOVEMENT MODEL = DIRECTION-STEP: a click NEAR the hero sets a direction; the road whose end-direction best matches is chosen and the hero steps a fixed ROAD_CLICK_STEP along its offset (move_toward to dest_off) — click projection on the curve is NOT used, so bends/loops never stall and you needn't aim at the line or click into fog. Reaching a road endpoint = 'reached node' (navigation: current_location/discovered/open next roads, NO quest). Entering a location (quest/action) = a separate click on its icon/marker within ICON_CLICK_R. The sample points below are reference coords only — you do NOT need to click them. NB: Village waypoint marker is at (-958,-530), the three Village curves meet at the unchanged junction (-888,-504).",
   "waypoints": {
     "Castle": {
       "pos": [
@@ -13,6 +13,10 @@
     },
     "Village": {
       "pos": [
+        -958,
+        -530
+      ],
+      "junction": [
         -888,
         -504
       ],
