@@ -139,6 +139,10 @@ const ROAD_VISIBLE_R   := 210.0
 const HERO_VISIBLE_R   := 110.0
 # Расстояние до вейпоинта чтобы засчитать прибытие
 const ARRIVAL_RADIUS   := 60.0
+# V2: допуск arrival к junction. НЕ равен шагу (60) — иначе остановка за ~45px до
+# конца сегмента ложно считается прибытием. Junction засчитываем только когда
+# герой реально на dest_off (или последний шаг дотянул target_off до dest_off).
+const V2_JUNCTION_ARRIVE_EPS := 6.0
 # Радиус явного клика по иконке локации = вход. Маленький: клик строго по табличке,
 # а не рядом. ЕДИНСТВЕННЫЙ способ войти (road-click внутрь локации не заводит).
 const ICON_CLICK_R     := 18.0
@@ -179,6 +183,20 @@ var _road_arrive_intended: bool = false
 # Форс-вход: road-движение, запущенное ЯВНЫМ кликом по иконке (_enter_location_click),
 # завершается входом в локацию. Обычный road-click его НЕ ставит → проход без захвата.
 var _road_force_enter: bool = false
+
+# ── RoadGraph V2 runtime (Phase 2) ───────────────────────────────
+# Вертикальный срез новой навигации junction≠location. Включается ПЕРВЫМ в
+# _try_road_click; если клик не ложится на V2-граф — падаем в старую логику
+# (fallback). Destination всегда junction (не локация): проезд узла НЕ входит в
+# локацию, НЕ вызывает _reach_location_node / _run_location_action. Вход в
+# локацию остаётся отдельным icon-click.
+var _v2_enabled := true
+var _v2_current_junction := "CastleJunction"   # junction под героем ("" = в пути)
+var _v2_current_segment := ""                   # ключ сегмента в движении ("" = стоит)
+var _v2_road_dest := ""                          # целевой junction текущего движения
+var _v2_road_path: Path2D = null                 # активный Path2D V2-движения
+var _v2_road_target_off := 0.0                   # offset цели текущего ШАГА (move_toward)
+var _v2_road_dest_off := 0.0                     # offset конца сегмента (dest junction)
 
 # Визуальная настройка карты: Marker2D в Main.tscn под MapTuningMarkers.
 # Если маркер есть — берём его global_position; иначе fallback на константы
@@ -392,6 +410,13 @@ func _try_move_to(id: String) -> void:
 func _enter_location_click(id: String) -> void:
 	if not _is_accessible(id):
 		return
+	# Герой уже стоит НА иконке (напр. припаркован на её junction в V2): вход НА
+	# МЕСТЕ = reach node + action, без повторного маршрута от current_location
+	# (иначе _try_move_to увёл бы героя назад к current_location и обратно).
+	if hero.global_position.distance_to(_pos(id)) < ARRIVAL_RADIUS:
+		_reach_location_node(id)
+		_run_location_action(id)
+		return
 	if _road_active and _road_path != null:
 		var curve := _road_path.curve
 		var total := curve.get_baked_length()
@@ -542,6 +567,206 @@ func _try_through_road(world_pos: Vector2, click_dir: Vector2) -> bool:
 			return _commit_road_move(p, a, hero_off, target_off, false)
 	return false
 
+# ──────────────── RoadGraph V2 — навигация по junction-графу ──────
+# Phase 2 вертикальный срез: CastleJunction→VillageJunction→LumbermillJunction→
+# MineJunction. junction = дорожный узел (проезд action не запускает), Location =
+# иконка (вход только icon-click). Сегмент = существующий Path2D между узлами.
+
+## Ключ сегмента: junction-имена в алфавитном порядке ("A-B").
+func _v2_segment_key(a: String, b: String) -> String:
+	var s := [a, b]
+	s.sort()
+	return str(s[0]) + "-" + str(s[1])
+
+## Мировая позиция junction: Marker2D из RoadGraph/Junctions, иначе позиция
+## связанной локации из WAYPOINTS.
+func _v2_get_junction_pos(junction_id: String) -> Vector2:
+	var m := get_node_or_null(NodePath("RoadGraph/Junctions/" + junction_id))
+	if m != null:
+		return (m as Node2D).global_position
+	var loc: String = ROAD_JUNCTIONS.get(junction_id, "")
+	if loc != "" and WAYPOINTS.has(loc):
+		return WAYPOINTS[loc]["pos"]
+	return hero.global_position
+
+## Path2D сегмента между двумя junction (любой порядок) или null.
+func _v2_get_segment_path(a: String, b: String) -> Path2D:
+	for seg: Array in ROAD_SEGMENTS_V2:
+		var ja := str(seg[0]); var jb := str(seg[1])
+		if (ja == a and jb == b) or (ja == b and jb == a):
+			var n := get_node_or_null(NodePath(str(seg[2])))
+			if n != null and n is Path2D:
+				return n as Path2D
+	return null
+
+## Соседние junction по сегментам V2.
+func _v2_adjacent_junctions(junction_id: String) -> Array:
+	var out: Array = []
+	for seg: Array in ROAD_SEGMENTS_V2:
+		if str(seg[0]) == junction_id:
+			out.append(str(seg[1]))
+		elif str(seg[1]) == junction_id:
+			out.append(str(seg[0]))
+	return out
+
+## junction, на котором СЕЙЧАС физически стоит герой (в пределах ARRIVAL_RADIUS),
+## или "" если герой не на узле V2-графа. Делает V2 устойчивым к рассинхрону
+## после старой навигации (вход в локацию вернул героя на иконку = узел).
+func _v2_junction_at(pos: Vector2) -> String:
+	var best := ""; var best_d := ARRIVAL_RADIUS
+	for jid in ROAD_JUNCTIONS.keys():
+		var d := pos.distance_to(_v2_get_junction_pos(str(jid)))
+		if d < best_d:
+			best_d = d; best = str(jid)
+	return best
+
+## ВХОД V2 в _try_road_click. true = клик обработан V2; false = пусть решает старая
+## навигация (fallback). Герой на узле → выбираем соседний сегмент по направлению
+## клика; герой на сегменте → продолжаем вперёд/назад. destination — всегда
+## junction, не локация → проезд узла НЕ входит в локацию.
+func _v2_try_road_click(world_pos: Vector2, click_dir: Vector2) -> bool:
+	if not _v2_enabled:
+		return false
+	# Герой стоит ПОСРЕДИ сегмента (прерванное движение) — продолжить по offset.
+	if _v2_current_segment != "":
+		return _v2_continue_segment(click_dir)
+	# Иначе герой должен физически стоять на junction V2-графа.
+	var here := _v2_junction_at(hero.global_position)
+	if here == "":
+		_v2_current_junction = ""
+		return false   # не на V2-узле → старая навигация
+	_v2_current_junction = here
+	# Выбрать соседний junction, направление к которому ближе всего к клику.
+	var best_to := ""
+	var best_dot := cos(deg_to_rad(DIR_TOLERANCE_DEG))
+	for to_j: String in _v2_adjacent_junctions(here):
+		var to_vec := _v2_get_junction_pos(to_j) - hero.global_position
+		if to_vec.length() < 1.0:
+			continue
+		var dot := click_dir.dot(to_vec.normalized())
+		if dot > best_dot:
+			best_dot = dot; best_to = to_j
+	if best_to == "":
+		return false   # клик не вдоль ни одного V2-сегмента → старая навигация
+	var path := _v2_get_segment_path(here, best_to)
+	if path == null:
+		return false
+	var curve := path.curve
+	var hero_off := curve.get_closest_offset(path.to_local(hero.global_position))
+	var dest_off := curve.get_closest_offset(path.to_local(_v2_get_junction_pos(best_to)))
+	print("[ROADGRAPH_V2_CLICK] from=%s to=%s path=%s" % [here, best_to, path.name])
+	return _v2_move_step(path, _v2_segment_key(here, best_to), best_to, hero_off, dest_off)
+
+## Продолжение когда герой стоит ПОСРЕДИ V2-сегмента: один ШАГ вперёд к dest или
+## назад к противоположному концу — по знаку dot с тангенсом кривой. Боковой клик
+## НЕ перескакивает на side-road (consume + skip-лог), чтобы не сорвать сегмент.
+func _v2_continue_segment(click_dir: Vector2) -> bool:
+	var parts := _v2_current_segment.split("-")
+	if parts.size() != 2:
+		_v2_current_segment = ""
+		return false
+	var ea := str(parts[0]); var eb := str(parts[1])
+	var path := _v2_get_segment_path(ea, eb)
+	if path == null:
+		return false
+	var dest_j := _v2_road_dest if _v2_road_dest != "" else eb
+	var opp_j := eb if dest_j == ea else ea
+	var curve := path.curve
+	var hero_off := curve.get_closest_offset(path.to_local(hero.global_position))
+	var dest_off := curve.get_closest_offset(path.to_local(_v2_get_junction_pos(dest_j)))
+	# NEAR-END: до dest осталось <= шаг+eps → ВСЕГДА финальный шаг до dest_off, без
+	# анализа dot. У поворота тангенс ненадёжен (клик в сторону следующей дороги
+	# давал ложный reverse/sideways → герой застревал на развилке). Любой road-click
+	# в near-end зоне довозит героя до junction → arrival. (reverse у конца не нужен.)
+	if absf(dest_off - hero_off) <= ROAD_ADVANCE_STEP + V2_JUNCTION_ARRIVE_EPS:
+		return _v2_move_step(path, _v2_current_segment, dest_j, hero_off, dest_off)
+	# Иначе — обычный шаг по направлению клика: вперёд к dest или назад к opp.
+	var opp_off := curve.get_closest_offset(path.to_local(_v2_get_junction_pos(opp_j)))
+	var ahead_off := move_toward(hero_off, dest_off, minf(ROAD_ADVANCE_STEP, 40.0))
+	var road_vec := path.to_global(curve.sample_baked(ahead_off)) - hero.global_position
+	if road_vec.length() <= 1.0:
+		return true   # практически на конце — клик съели, не падаем в side-road
+	var dot := click_dir.dot(road_vec.normalized())
+	if dot >= ROAD_CONTINUE_MIN_DOT:
+		print("[ROADGRAPH_V2_CLICK] from=%s to=%s path=%s (continue)" % [opp_j, dest_j, path.name])
+		return _v2_move_step(path, _v2_current_segment, dest_j, hero_off, dest_off)
+	elif dot <= -ROAD_CONTINUE_MIN_DOT:
+		print("[ROADGRAPH_V2_CLICK] from=%s to=%s path=%s (reverse)" % [dest_j, opp_j, path.name])
+		return _v2_move_step(path, _v2_current_segment, opp_j, hero_off, opp_off)
+	# Боковой клик посреди сегмента (НЕ у конца) — игнорируем (не перескакиваем на side-road).
+	print("[ROADGRAPH_V2_SKIP] segment=%s reason=sideways dot=%.3f" % [_v2_current_segment, dot])
+	return true
+
+## ОДИН ШАГ V2: двигает героя на ROAD_ADVANCE_STEP (~60px) по offset к dest_j (НЕ
+## весь сегмент) — мелкий шаг как старая road-система, под будущие encounters по
+## offset. target_off = move_toward(hero_off, dest_off, ROAD_ADVANCE_STEP). Если
+## target не дотянул до конца → остановка посреди сегмента (junction НЕ достигнут).
+## _v2_current_junction НЕ обнуляем — он держит исходный узел, пока герой в пути.
+func _v2_move_step(path: Path2D, seg_key: String, dest_j: String,
+		hero_off: float, dest_off: float) -> bool:
+	var target_off := move_toward(hero_off, dest_off, ROAD_ADVANCE_STEP)
+	# Шаг пустой: герой уже фактически на dest — мгновенный arrival, без движения.
+	if absf(target_off - hero_off) < 5.0:
+		if absf(hero_off - dest_off) <= V2_JUNCTION_ARRIVE_EPS:
+			_v2_arrive_at_junction(dest_j)
+			return true
+		return true   # некуда шагать, но и не на узле — клик съели
+	_v2_current_segment = seg_key
+	_v2_road_dest = dest_j
+	_v2_road_dest_off = dest_off
+	_v2_road_path = path
+	_v2_road_target_off = target_off
+	_last_trail_pos = hero.global_position
+	print("[ROADGRAPH_V2_STEP] segment=%s from_off=%.1f target_off=%.1f dest_off=%.1f" \
+		% [seg_key, hero_off, target_off, dest_off])
+	hero.move_along_path("_v2road_", _build_partial_path(path, hero_off, target_off))
+	return true
+
+## Прибытие V2-шага. Дошёл до конца сегмента (рядом с dest_off) → junction arrival;
+## иначе остановка ПОСРЕДИ сегмента: сегмент/цель сохраняем, следующий клик
+## вдоль дороги продолжит этот же сегмент. Ни в одном случае — НЕ вход в локацию.
+func _v2_on_arrived() -> void:
+	if _v2_road_path == null:
+		return
+	var curve := _v2_road_path.curve
+	var hero_off := curve.get_closest_offset(_v2_road_path.to_local(hero.global_position))
+	# Arrival только если герой реально на конце сегмента (eps), ИЛИ последний шаг
+	# целился ровно в dest_off. Иначе это остановка посреди сегмента — даже если до
+	# конца < шага (60). Следующий клик дотянет target_off до dest_off → ARRIVAL.
+	var at_dest := absf(hero_off - _v2_road_dest_off) <= V2_JUNCTION_ARRIVE_EPS
+	var target_was_dest := absf(_v2_road_target_off - _v2_road_dest_off) <= V2_JUNCTION_ARRIVE_EPS
+	if at_dest or target_was_dest:
+		_v2_arrive_at_junction(_v2_road_dest)
+	else:
+		# Остановка посреди сегмента: _v2_current_junction/segment НЕ меняем,
+		# _reach_location_node / _run_location_action НЕ вызываем.
+		print("[ROADGRAPH_V2_STOP] segment=%s off=%.1f" % [_v2_current_segment, hero_off])
+		_debug_state("v2 road stop %s off=%s" % [_v2_current_segment, str(snapped(hero_off, 0.1))])
+		queue_redraw()
+
+## Достигли junction: ТОЛЬКО обновляем V2-состояние и логируем. НЕ вызываем
+## _reach_location_node и НЕ _run_location_action — проезд узла не входит в
+## локацию ([LOCATION_ENTER] от road-click не появляется). Герой остаётся на узле.
+func _v2_arrive_at_junction(junction_id: String) -> void:
+	print("[ROADGRAPH_V2_ARRIVAL] junction=%s" % junction_id)
+	_v2_current_junction = junction_id
+	_v2_current_segment = ""
+	_v2_road_dest = ""
+	_v2_road_path = null
+	_v2_road_target_off = 0.0
+	_v2_road_dest_off = 0.0
+	_last_trail_pos = Vector2(-99999.0, -99999.0)
+	# DISCOVER связанной локации — туман/discovered/соседи/UI БЕЗ действия и БЕЗ
+	# смены current_location. Проезд junction = «локация найдена», не «вход».
+	# Вход (action/[LOCATION_ENTER]) — отдельно, icon-click'ом.
+	var loc: String = ROAD_JUNCTIONS.get(junction_id, "")
+	if loc != "":
+		print("[ROADGRAPH_V2_REACH] junction=%s location=%s" % [junction_id, loc])
+		_discover_location(loc)   # discovered/туман/соседи/UI; current_location и action НЕ трогаются
+	else:
+		_debug_state("v2 junction: " + junction_id)
+	queue_redraw()
+
 ## DIRECTION-STEP: клик РЯДОМ С ГЕРОЕМ задаёт НАПРАВЛЕНИЕ (click_dir), а не точку на
 ## карте. Выбираем активную дорогу/ветку, направление к концу которой лучше совпадает с
 ## click_dir (на развилке — любую из сходящихся, оба конца — кандидаты на dest). Затем
@@ -553,6 +778,12 @@ func _try_road_click(world_pos: Vector2) -> bool:
 	if click_vec.length() < 1.0:
 		return false
 	var click_dir := click_vec.normalized()
+
+	# ── V2 RoadGraph: junction-граф имеет приоритет на тестовом маршруте. Если
+	#    клик не ложится на V2-граф — _v2_try_road_click вернёт false и ниже
+	#    отработает старая навигация (fallback для остальных дорог).
+	if _v2_enabled and _v2_try_road_click(world_pos, click_dir):
+		return true
 
 	# Герой уже стоит В текущей дорожной локации (fast-path пропущен через
 	# dest_is_current_location): общий выбор должен брать ТОЛЬКО дороги,
@@ -755,6 +986,8 @@ func _build_partial_path(path: Path2D, from_off: float, to_off: float) -> Array[
 ## (НЕ endpoint-локация _road_dest). icon-click: waypoint цели. Иначе — позиция.
 ## Только чтение, на игровую логику не влияет.
 func get_debug_target_position() -> Vector2:
+	if _v2_road_path != null and hero.target_location == "_v2road_":
+		return _v2_road_path.to_global(_v2_road_path.curve.sample_baked(_v2_road_target_off))
 	if _road_path != null and (_road_active or hero.target_location == "_road_"):
 		return _road_path.to_global(_road_path.curve.sample_baked(_road_target_off))
 	if hero.is_moving and WAYPOINTS.has(hero.target_location):
@@ -770,6 +1003,10 @@ func on_route_event(_from: String, _to: String) -> void:
 
 # ──────────────── Прибытие ───────────────────────────────────────
 func _on_hero_arrived(location_name: String) -> void:
+	if location_name == "_v2road_":
+		# V2 RoadGraph: прибытие к junction. Навигация по узлам, НЕ вход в локацию.
+		_v2_on_arrived()
+		return
 	if location_name == "_road_":
 		# Остановка на дороге. Различаем НАВИГАЦИЮ и ДЕЙСТВИЕ:
 		#  • дошёл до КОНЦА дороги (endpoint локации) → REACH NODE: навигация
@@ -804,10 +1041,25 @@ func _on_hero_arrived(location_name: String) -> void:
 	_reach_location_node(location_name)
 	_run_location_action(location_name)
 
+## DISCOVER (НЕ enter): локация НАЙДЕНА — туман + discovered + соседние дороги + UI
+## «Открыто». НЕ меняет current_location, НЕ запускает _run_location_action
+## ([LOCATION_ENTER] не появляется), НЕ трогает V2/_road state. Вызывается при
+## проезде junction (road-click). Вход в локацию (action) — отдельно, icon-click'ом.
+func _discover_location(location_name: String) -> void:
+	discovered[location_name] = true
+	fog_overlay.reveal(_reveal_pos(location_name))
+	for neighbor in ROUTES[location_name]:
+		if _is_locked(neighbor):
+			continue
+		available[neighbor] = true
+	GameState.unlocked_locations = _get_discovered_list()
+	_update_ui()
+
 ## REACH/DISCOVER NODE — навигационная веха, НЕ вход внутрь локации.
 ## Ставит current_location, помечает discovered, открывает туман и исходящие дороги.
 ## Вызывается когда герой ДОШЁЛ до endpoint дороги (road-click) ИЛИ при явном входе.
 ## НЕ запускает квест/бой/экран — это отдельно делает _run_location_action.
+## (Старая навигация-fallback до Phase 4; V2-проезд использует _discover_location.)
 func _reach_location_node(location_name: String) -> void:
 	current_location           = location_name
 	GameState.current_location = location_name

@@ -297,7 +297,7 @@ position = Vector2(-560, -320)
 position = Vector2(-464, -488)
 
 [node name="LumbermillJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=3100000008]
-position = Vector2(-640, -752)
+position = Vector2(-592, -736)
 
 [node name="MineJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=3100000009]
 position = Vector2(-392, -832)
