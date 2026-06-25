@@ -148,6 +148,8 @@ const ROAD_VISIBLE_R   := 210.0
 const HERO_VISIBLE_R   := 110.0
 # Расстояние до вейпоинта чтобы засчитать прибытие
 const ARRIVAL_RADIUS   := 60.0
+# Phase 3B: радиус клика по fog direction marker (кликабельная точка на дороге)
+const FOG_MARKER_CLICK_R := 26.0
 # V2 target-node: радиус «клик попал в зону узла назначения / его иконки». Клик в
 # пределах этого расстояния от соседнего junction ИЛИ его иконки = команда идти к
 # нему. Дальше всех соседей — V2 не начинает движение (решает старая навигация).
@@ -204,6 +206,9 @@ var _v2_current_junction := "CastleJunction"   # навигационный як
 var _v2_road_dest := ""                          # целевой junction, пока герой идёт по ребру
 var _v2_road_path: Path2D = null                 # активный Path2D (для debug overlay)
 var _v2_road_target_off := 0.0                   # offset конца ребра (для debug overlay)
+
+# Phase 3B: предыдущий набор fog-маркеров (для дедупа лога [FOG_MARKER_SHOW]).
+var _last_marker_set := ""
 
 # Визуальная настройка карты: Marker2D в Main.tscn под MapTuningMarkers.
 # Если маркер есть — берём его global_position; иначе fallback на константы
@@ -332,6 +337,15 @@ func _input(event: InputEvent) -> void:
 		if hero.is_moving:
 			return
 		var world_pos := get_global_mouse_position()
+
+		# ── FOG DIRECTION MARKER (Phase 3B): клик по маркеру у края тумана = явный
+		#    V2-переход к ЕГО target. target хранится в маркере, НЕ выбирается по
+		#    близости. Проверяем первым — до обычного road-click.
+		for m: Dictionary in _compute_fog_markers():
+			if world_pos.distance_to(m["pos"]) <= FOG_MARKER_CLICK_R:
+				print("[FOG_MARKER_CLICK] target=%s" % str(m["target"]))
+				_v2_travel_to(str(m["target"]))
+				return
 
 		# ── V2 ВЛАДЕЕТ ВВОДОМ: пока герой в V2-зоне, map-click обрабатывает ТОЛЬКО
 		#    target-node навигация. Вход в локацию с карты отключён (только клавиша E).
@@ -797,6 +811,67 @@ func _v2_has_input_control() -> bool:
 		or _v2_junction_at(hero.global_position) != ""
 	)
 
+## Phase 3B: fog direction markers от ТЕКУЩЕГО V2-узла. Для каждого V2-соседа, чья
+## локация скрыта туманом (иконку не кликнуть), даём кликабельную точку на дороге у
+## края тумана. target хранится ЯВНО. Возвращает [{target, pos}]. Только чтение.
+func _compute_fog_markers() -> Array:
+	var out: Array = []
+	if hero.is_moving:
+		return out
+	var here := _v2_junction_at(hero.global_position)
+	if here == "":
+		return out
+	for nb: String in _v2_adjacent_junctions(here):
+		var loc: String = ROAD_JUNCTIONS.get(nb, "")
+		# Сосед кликается нормально (иконка discovered И видна) → маркер не нужен.
+		if loc != "" and (discovered.get(loc, false) as bool) \
+				and _is_road_point_visible(_v2_get_junction_pos(nb)):
+			continue
+		var mpos := _fog_marker_pos(here, nb)
+		if mpos == Vector2.INF:
+			continue
+		out.append({ "target": nb, "pos": mpos })
+	return out
+
+## Точка маркера на дороге here→nb: последняя ВИДИМАЯ точка кривой в сторону соседа
+## (край тумана). Vector2.INF = дорога/кривая не найдена.
+func _fog_marker_pos(here: String, nb: String) -> Vector2:
+	var path := _v2_get_segment_path(here, nb)
+	if path == null or path.curve == null:
+		return Vector2.INF
+	var curve := path.curve
+	var total := curve.get_baked_length()
+	if total <= 0.0:
+		return Vector2.INF
+	var here_off := curve.get_closest_offset(path.to_local(_v2_get_junction_pos(here)))
+	var nb_off := curve.get_closest_offset(path.to_local(_v2_get_junction_pos(nb)))
+	var dir := 1.0 if nb_off >= here_off else -1.0
+	var last_vis := path.to_global(curve.sample_baked(here_off))
+	var off := here_off
+	while (dir > 0.0 and off < nb_off) or (dir < 0.0 and off > nb_off):
+		off += dir * 24.0
+		var p := path.to_global(curve.sample_baked(clampf(off, 0.0, total)))
+		if _is_road_point_visible(p):
+			last_vis = p
+		else:
+			break
+	return last_vis
+
+## Phase 3B: явный V2-переход к КОНКРЕТНОМУ target junction (из fog-marker). target
+## задан явно — НЕ выбирается по близости клика. Дальше — обычный V2-flow.
+func _v2_travel_to(target_junction: String) -> bool:
+	var here := _v2_junction_at(hero.global_position)
+	if here == "":
+		here = _v2_current_junction
+	if here == "":
+		return false
+	_v2_current_junction = here
+	var path := _v2_get_segment_path(here, target_junction)
+	if path == null:
+		return false
+	print("[ROADGRAPH_V2_CLICK] from=%s to=%s path=%s" % [here, target_junction, path.name])
+	return _v2_walk_segment(path, here, target_junction)
+
 ## DIRECTION-STEP: клик РЯДОМ С ГЕРОЕМ задаёт НАПРАВЛЕНИЕ (click_dir), а не точку на
 ## карте. Выбираем активную дорогу/ветку, направление к концу которой лучше совпадает с
 ## click_dir (на развилке — любую из сходящихся, оба конца — кандидаты на dest). Затем
@@ -1148,6 +1223,28 @@ func _debug_state(context: String) -> void:
 func _draw() -> void:
 	_draw_roads()
 	_draw_waypoints()
+	_draw_fog_markers()
+
+## Phase 3B: рендер fog direction markers + дедуп-лог [FOG_MARKER_SHOW] (один раз
+## при изменении набора, не каждый кадр). Placeholder-арт: кружок+пульс.
+func _draw_fog_markers() -> void:
+	var markers := _compute_fog_markers()
+	var keys: Array = []
+	for m: Dictionary in markers:
+		keys.append(str(m["target"]))
+	keys.sort()
+	var set_id := ",".join(keys)
+	if set_id != _last_marker_set:
+		_last_marker_set = set_id
+		var here := _v2_junction_at(hero.global_position)
+		for m2: Dictionary in markers:
+			print("[FOG_MARKER_SHOW] from=%s to=%s" % [here, str(m2["target"])])
+	var t := Time.get_ticks_msec() * 0.004
+	var pulse := 0.5 + 0.5 * sin(t)
+	for m3: Dictionary in markers:
+		var pos: Vector2 = m3["pos"]
+		draw_circle(pos, 10.0, Color(1.0, 0.7, 0.2, 0.9))
+		draw_arc(pos, 14.0 + pulse * 4.0, 0.0, TAU, 32, Color(1.0, 0.85, 0.4, 0.8), 2.0)
 
 func _draw_roads() -> void:
 	var drawn: Dictionary = {}
