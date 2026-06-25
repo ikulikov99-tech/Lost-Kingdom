@@ -56,9 +56,9 @@ point_count = 12
 
 [sub_resource type="Curve2D" id="Curve2D_earthmage_mine_main"]
 _data = {
-"points": PackedVector2Array(0, 0, 0, 0, -432, -600, 0, 0, 0, 0, -392, -576, 0, 0, 0, 0, -376, -552, 0, 0, 0, 0, -416, -504, 0, 0, 0, 0, -456, -488, 0, 0, 0, 0, -496, -448, 0, 0, 0, 0, -512, -432, 0, 0, 0, 0, -504, -376, 0, 0, 0, 0, -528, -344, 0, 0, 0, 0, -560, -312, 0, 0, 0, 0, -616, -288, 0, 0, 0, 0, -680, -264, 0, 0, 0, 0, -736, -232, 0, 0, 0, 0, -792, -232, 0, 0, 0, 0, -872, -240, 0, 0, 0, 0, -896, -272, 0, 0, 0, 0, -896, -328, 0, 0, 0, 0, -968, -392, 0, 0, 0, 0, -984, -432, 0, 0, 0, 0, -904, -456, 0, 0, 0, 0, -864, -480, 0, 0, 0, 0, -832, -536, 0, 0, 0, 0, -840, -576, 0, 0, 0, 0, -784, -608, 0, 0, 0, 0, -712, -648, 0, 0, 0, 0, -648, -680, 0, 0, 0, 0, -592, -728, 0, 0, 0, 0, -528, -744, 0, 0, 0, 0, -480, -760, 0, 0, 0, 0, -424, -800, 0, 0, 0, 0, -376, -816)
+"points": PackedVector2Array(0, 0, 0, 0, -432, -600, 0, 0, 0, 0, -392, -576, 0, 0, 0, 0, -376, -552, 0, 0, 0, 0, -416, -504, 0, 0, 0, 0, -456, -488, 0, 0, 0, 0, -496, -448, 0, 0, 0, 0, -512, -432, 0, 0, 0, 0, -504, -376, 0, 0, 0, 0, -524.1255, -368.255, 0, 0, 0, 0, -528, -344, 0, 0, 0, 0, -560, -312, 0, 0, 0, 0, -616, -288, 0, 0, 0, 0, -680, -264, 0, 0, 0, 0, -736, -232, 0, 0, 0, 0, -792, -232, 0, 0, 0, 0, -872, -240, 0, 0, 0, 0, -896, -272, 0, 0, 0, 0, -896, -328, 0, 0, 0, 0, -968, -392, 0, 0, 0, 0, -984, -432, 0, 0, 0, 0, -904, -456, 0, 0, 0, 0, -864, -480, 0, 0, 0, 0, -832, -536, 0, 0, 0, 0, -840, -576, 0, 0, 0, 0, -784, -608, 0, 0, 0, 0, -712, -648, 0, 0, 0, 0, -648, -680, 0, 0, 0, 0, -592, -728, 0, 0, 0, 0, -528, -744, 0, 0, 0, 0, -480, -760, 0, 0, 0, 0, -424, -800, 0, 0, 0, 0, -376, -816)
 }
-point_count = 31
+point_count = 32
 
 [sub_resource type="Curve2D" id="Curve2D_earthmage_darkcastle"]
 _data = {
@@ -274,33 +274,33 @@ position = Vector2(-416, -944)
 [node name="DarkCastle" type="Marker2D" parent="MapTuningMarkers/RevealCenters" unique_id=1688494889]
 position = Vector2(-200, -640)
 
-[node name="RoadGraph" type="Node2D" parent="." unique_id=3100000000]
+[node name="RoadGraph" type="Node2D" parent="." unique_id=-1194967296]
 
-[node name="Junctions" type="Node2D" parent="RoadGraph" unique_id=3100000001]
+[node name="Junctions" type="Node2D" parent="RoadGraph" unique_id=-1194967295]
 
-[node name="CastleJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=3100000002]
+[node name="CastleJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=-1194967294]
 position = Vector2(-1112, -704)
 
-[node name="VillageJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=3100000003]
-position = Vector2(-928, -504)
+[node name="VillageJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=-1194967293]
+position = Vector2(-912, -512)
 
-[node name="DockJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=3100000004]
+[node name="DockJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=-1194967292]
 position = Vector2(-1160, -128)
 
-[node name="KnightRuinsJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=3100000005]
+[node name="KnightRuinsJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=-1194967291]
 position = Vector2(-792, -288)
 
-[node name="MageTowerJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=3100000006]
+[node name="MageTowerJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=-1194967290]
 position = Vector2(-560, -320)
 
-[node name="EarthMageJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=3100000007]
+[node name="EarthMageJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=-1194967289]
 position = Vector2(-464, -488)
 
-[node name="LumbermillJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=3100000008]
+[node name="LumbermillJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=-1194967288]
 position = Vector2(-592, -736)
 
-[node name="MineJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=3100000009]
+[node name="MineJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=-1194967287]
 position = Vector2(-392, -832)
 
-[node name="DarkCastleJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=3100000010]
+[node name="DarkCastleJunction" type="Marker2D" parent="RoadGraph/Junctions" unique_id=-1194967286]
 position = Vector2(-376, -568)
