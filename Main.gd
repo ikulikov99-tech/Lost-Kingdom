@@ -105,6 +105,15 @@ const ROAD_SEGMENTS_V2 := [
 	["LumbermillJunction", "MineJunction",      "LumbermillMinePath"],
 ]
 
+# Road encounters: события на Path2D-сегменте, привязанные по доле пройденного
+# пути (at_ratio, середина = «засада в пути»). Срабатывают ОДИН раз за run (дедуп
+# в RunState.fired_encounters). Phase 4A — только stub-лог [ROAD_ENCOUNTER];
+# формат боя НЕ зафиксирован (позже может стать отдельной road-ambush-defense сценой).
+const ROAD_ENCOUNTER_BAND := 0.08   # полуширина зоны срабатывания по ratio
+const ROAD_ENCOUNTERS := [
+	{ "id": "bandit_ambush", "segment": "VillageLumbermillPath", "at_ratio": 0.5 },
+]
+
 # ──────────────── Состояние ──────────────────────────────────────
 var current_location: String    = "Castle"
 # discovered: туман открыт, считается в счётчике "Открыто"
@@ -233,6 +242,9 @@ func _ready() -> void:
 	_update_ui()
 	_debug_state("_ready")
 	_verify_roadgraph_v2()
+	# Старт забега: один запуск карты = один run (Phase 4A). Позже старт привяжем
+	# к «выходу из Castle», конец — к смерти/возврату.
+	RunState.start_run()
 	queue_redraw()
 
 # ──────────────── Вспомогательные ────────────────────────────────
@@ -354,6 +366,26 @@ func _physics_process(_delta: float) -> void:
 		if _last_trail_pos.distance_to(hpos) >= TRAIL_STEP:
 			fog_overlay.add_trail_point(hpos)
 			_last_trail_pos = hpos
+		_check_road_encounters()
+
+## Road-encounter во время V2-движения. ТОЛЬКО чтение для навигации: лог + дедуп в
+## RunState, БЕЗ остановки героя и БЕЗ изменения _v2_road_*. Жёсткий V2-гейт
+## (target_location "_v2road_") — старая навигация сюда не попадает. Phase 4A: stub.
+func _check_road_encounters() -> void:
+	if _v2_road_path == null or not hero.target_location.begins_with("_v2road_"):
+		return
+	var curve := _v2_road_path.curve
+	var total := curve.get_baked_length()
+	if total <= 0.0:
+		return
+	var ratio := curve.get_closest_offset(_v2_road_path.to_local(hero.global_position)) / total
+	for enc: Dictionary in ROAD_ENCOUNTERS:
+		var eid := str(enc["id"])
+		if str(enc["segment"]) != str(_v2_road_path.name) or RunState.has_fired(eid):
+			continue
+		if absf(ratio - float(enc["at_ratio"])) <= ROAD_ENCOUNTER_BAND:
+			print("[ROAD_ENCOUNTER] type=%s segment=%s" % [eid, _v2_road_path.name])
+			RunState.mark_fired(eid)
 
 func _process(_delta: float) -> void:
 	# Резервное обновление тумана на случай кадров без physics_process
