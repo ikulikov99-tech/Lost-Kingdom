@@ -316,6 +316,27 @@ func _push_camera_to_fog() -> void:
 	fog_overlay.update_camera(_screen_center_world(), camera.zoom.x, vp_size)
 	fog_overlay.update_hero_pos(hero.global_position)
 
+# ──────────────── Камера (5B): zoom / pan / центр ────────────────
+# Камера — child Hero (follow). Pan = аддитивный camera.offset (выход за карту
+# обрезают limit_* камеры). Стартовый zoom (1.3) задан в сцене — здесь НЕ меняем,
+# только клампим в рантайме. CAM_ZOOM_MIN — ПОТОЛОК zoom-out («junction + соседи»),
+# не стартовое значение.
+const DEBUG_CAMERA := false          # временный [CAM]-лог, по умолчанию выключен
+const CAM_ZOOM_MIN := 0.72           # нижний предел zoom-out
+const CAM_ZOOM_MAX := 1.6            # лёгкий zoom-in
+const CAM_ZOOM_STEP := 0.1           # шаг колеса
+var _cam_panning: bool = false       # активен drag-pan (ПКМ или средняя кнопка)
+
+func _cam_log(action: String) -> void:
+	if DEBUG_CAMERA:
+		print("[CAM] %s zoom=%.2f offset=(%.0f,%.0f)" \
+			% [action, camera.zoom.x, camera.offset.x, camera.offset.y])
+
+func _cam_zoom_by(step: float) -> void:
+	var z := clampf(camera.zoom.x + step, CAM_ZOOM_MIN, CAM_ZOOM_MAX)
+	camera.zoom = Vector2(z, z)
+	_cam_log("zoom")
+
 # ──────────────── Ввод ───────────────────────────────────────────
 func _input(event: InputEvent) -> void:
 	# ── Клавиша E: ВХОД в локацию текущего V2-узла. Единственный путь к
@@ -330,6 +351,32 @@ func _input(event: InputEvent) -> void:
 		var enter_loc: String = ROAD_JUNCTIONS.get(here, "")
 		if enter_loc != "" and (discovered.get(enter_loc, false) as bool):
 			_v2_enter_location(enter_loc)
+		return
+
+	# ── КАМЕРА (5B): C = центр на герое; колесо = zoom (клампится); ПКМ/средняя =
+	#    drag-pan. ЛКМ и V2-навигация НЕ затрагиваются (отдельные кнопки/события).
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_C:
+		camera.offset = Vector2.ZERO
+		_cam_log("center")
+		return
+
+	if event is InputEventMouseButton:
+		var b: int = event.button_index
+		if event.pressed and b == MOUSE_BUTTON_WHEEL_UP:
+			_cam_zoom_by(CAM_ZOOM_STEP)
+			return
+		if event.pressed and b == MOUSE_BUTTON_WHEEL_DOWN:
+			_cam_zoom_by(-CAM_ZOOM_STEP)
+			return
+		if b == MOUSE_BUTTON_RIGHT or b == MOUSE_BUTTON_MIDDLE:
+			_cam_panning = event.pressed   # press = старт pan, release = стоп
+			return
+
+	if event is InputEventMouseMotion and _cam_panning:
+		# Grab-the-map: вид тянется за курсором (экранные px → мировые: /zoom).
+		camera.offset -= event.relative / camera.zoom.x
+		_cam_log("pan")
 		return
 
 	if event is InputEventMouseButton and \
@@ -738,6 +785,8 @@ func _v2_walk_segment(path: Path2D, _from_j: String, target_j: String) -> bool:
 	_v2_road_path = path
 	_v2_road_target_off = dest_off
 	_last_trail_pos = hero.global_position
+	camera.offset = Vector2.ZERO   # 5B: старт ходьбы → камера обратно в follow
+	_cam_log("reset")
 	hero.move_along_path("_v2road_" + target_j, _build_partial_path(path, hero_off, dest_off))
 	return true
 
