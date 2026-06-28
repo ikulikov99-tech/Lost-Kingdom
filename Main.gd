@@ -33,7 +33,7 @@ const WAYPOINTS := {
 	"MageTower":       {"title": "Башня мага",          "pos": Vector2(-560,  -320)},
 	"EarthMageCastle": {"title": "Замок мага земли",    "pos": Vector2(-464,  -488)},
 	"DarkCastle":      {"title": "Замок тьмы",          "pos": Vector2(-376,  -568)},
-	"Lumbermill":      {"title": "Лесопилка",           "pos": Vector2(-640,  -752)},
+	"Lumbermill":      {"title": "Лесопилка",           "pos": Vector2(-680,  -825)},
 	"Mine":            {"title": "Заброшенная шахта",   "pos": Vector2(-392,  -832)},
 }
 
@@ -49,7 +49,7 @@ const REVEAL_CENTERS := {
 	"KnightRuins":     Vector2(-700, -330),
 	"MageTower":       Vector2(-530, -265),
 	"EarthMageCastle": Vector2(-600, -600),  # на замок; ~226px от DarkCastle (-376,-568) — прячет его
-	"Lumbermill":      Vector2(-615, -795),
+	"Lumbermill":      Vector2(-660, -815),
 }
 
 const ROUTES := {
@@ -152,6 +152,7 @@ const ARRIVAL_RADIUS   := 60.0
 const FOG_MARKER_CLICK_R := 26.0
 const LOCKED_SEAL_CLICK_R := 22.0
 const DEBUG_LOCKED := false   # [LOCKED_SEAL_*] логи под флагом (по умолчанию выкл)
+const DEBUG_LOCATION_ENTER := false   # [LOCATION_*] логи входа в локацию (по умолчанию выкл)
 # 5C-1 Locked seals: графовый сосед без V2-сегмента = запечатан. Path2D — по имени узла.
 const LOCKED_EDGES := {
 	"Village": [
@@ -223,6 +224,8 @@ var _v2_road_target_off := 0.0                   # offset конца ребра 
 var _last_marker_set := ""
 var _last_seal_set := ""          # дедуп [LOCKED_SEAL_SHOW]
 var _locked_msg_until := 0.0      # до этого времени (ms) показываем «Запечатано»
+var _guide_layer: CanvasLayer = null   # CanvasLayer выше тумана для guide-маркера
+var _guide_ctrl: Control = null        # Control, на котором рисуется guide (screen coords)
 
 # Визуальная настройка карты: Marker2D в Main.tscn под MapTuningMarkers.
 # Если маркер есть — берём его global_position; иначе fallback на константы
@@ -264,6 +267,7 @@ func _ready() -> void:
 	# Старт забега: один запуск карты = один run (Phase 4A). Позже старт привяжем
 	# к «выходу из Castle», конец — к смерти/возврату.
 	RunState.start_run()
+	_setup_guide_overlay()
 	queue_redraw()
 
 # ──────────────── Вспомогательные ────────────────────────────────
@@ -339,6 +343,7 @@ const DEBUG_CAMERA := false          # временный [CAM]-лог, по у�
 const CAM_ZOOM_MIN := 0.72           # нижний предел zoom-out
 const CAM_ZOOM_MAX := 1.6            # лёгкий zoom-in
 const CAM_ZOOM_STEP := 0.1           # шаг колеса
+const CAM_ZOOM_DEFAULT := 1.3        # нормальный игровой зум (как в Main.tscn); C сбрасывает к нему
 var _cam_panning: bool = false       # активен drag-pan (ПКМ или средняя кнопка)
 
 func _cam_log(action: String) -> void:
@@ -351,27 +356,26 @@ func _cam_zoom_by(step: float) -> void:
 	camera.zoom = Vector2(z, z)
 	_cam_log("zoom")
 
+## Сброс камеры к игровому виду: следование за героем (offset 0) + дефолтный зум.
+## Один источник правды для C, старта движения по дороге/V2-сегменту и guide-клика.
+func _reset_camera_to_gameplay_view() -> void:
+	camera.offset = Vector2.ZERO
+	camera.zoom = Vector2(CAM_ZOOM_DEFAULT, CAM_ZOOM_DEFAULT)
+
 # ──────────────── Ввод ───────────────────────────────────────────
 func _input(event: InputEvent) -> void:
 	# ── Клавиша E: ВХОД в локацию текущего V2-узла. Единственный путь к
 	#    [LOCATION_ENTER] — клик по карте в локацию больше НЕ входит.
 	if event is InputEventKey and event.pressed and not event.echo \
 			and event.keycode == KEY_E:
-		if hero.is_moving:
-			return
-		var here := _v2_junction_at(hero.global_position)
-		if here == "":
-			here = _v2_current_junction
-		var enter_loc: String = ROAD_JUNCTIONS.get(here, "")
-		if enter_loc != "" and (discovered.get(enter_loc, false) as bool):
-			_v2_enter_location(enter_loc)
+		_try_enter_current_location()
 		return
 
 	# ── КАМЕРА (5B): C = центр на герое; колесо = zoom (клампится); ПКМ/средняя =
 	#    drag-pan. ЛКМ и V2-навигация НЕ затрагиваются (отдельные кнопки/события).
 	if event is InputEventKey and event.pressed and not event.echo \
 			and event.keycode == KEY_C:
-		camera.offset = Vector2.ZERO
+		_reset_camera_to_gameplay_view()
 		_cam_log("center")
 		return
 
@@ -485,13 +489,17 @@ func _process(_delta: float) -> void:
 		tooltip_label.position = get_viewport().get_mouse_position() + Vector2(12, -28)
 	else:
 		var hovered := _find_any_waypoint(get_global_mouse_position(), 60.0)
-		if hovered != "":
+		# Имя по наведению — ТОЛЬКО для discovered. Available next-step имя показывает
+		# guide-маркер (без дубля). Скрытые/future/locked при hover молчат.
+		if hovered != "" and _hover_name_allowed(hovered):
 			tooltip_label.text    = _title(hovered)
 			tooltip_label.visible = true
 			tooltip_label.position = get_viewport().get_mouse_position() + Vector2(12, -28)
 		else:
 			tooltip_label.visible = false
 
+	if is_instance_valid(_guide_ctrl):
+		_guide_ctrl.queue_redraw()
 	if not hero.is_moving:
 		queue_redraw()
 
@@ -816,7 +824,7 @@ func _v2_walk_segment(path: Path2D, _from_j: String, target_j: String) -> bool:
 	_v2_road_path = path
 	_v2_road_target_off = dest_off
 	_last_trail_pos = hero.global_position
-	camera.offset = Vector2.ZERO   # 5B: старт ходьбы → камера обратно в follow
+	_reset_camera_to_gameplay_view()   # 5B: старт валидного движения → follow + дефолт-zoom
 	_cam_log("reset")
 	hero.move_along_path("_v2road_" + target_j, _build_partial_path(path, hero_off, dest_off))
 	return true
@@ -841,7 +849,13 @@ func _v2_arrive_at_junction(junction_id: String) -> void:
 	var loc: String = ROAD_JUNCTIONS.get(junction_id, "")
 	if loc != "":
 		print("[ROADGRAPH_V2_REACH] junction=%s location=%s" % [junction_id, loc])
-		_discover_location(loc)   # discovered/туман/соседи/UI; current_location и action НЕ трогаются
+		# «Текущее» = последняя достигнутая локация (статус-панель). НЕ запускаем
+		# action ([LOCATION_ENTER]) и НЕ трогаем _v2_current_junction — это делает
+		# отдельный icon-click. Обновляем только отображаемый current_location.
+		current_location = loc
+		GameState.current_location = loc
+		_discover_location(loc)   # discovered/туман/соседи/UI (+ _update_ui)
+		_dbg_enter("[LOCATION_READY] junction=%s loc=%s (нажми E для входа)" % [junction_id, loc])
 	else:
 		_debug_state("v2 junction: " + junction_id)
 	queue_redraw()
@@ -879,6 +893,47 @@ func _v2_enter_location(location_name: String) -> void:
 	_run_location_action(location_name)
 	_update_ui()
 	queue_redraw()
+
+## Вход по E в локацию ТЕКУЩЕГО узла. Единственный путь к [LOCATION_ENTER]. Узел берётся
+## по _resolve_enter_junction (узел/локация, не дистанция до картинки). Вынесено из _input,
+## чтобы не превышать gdlint max-returns. Логи под DEBUG_LOCATION_ENTER.
+func _try_enter_current_location() -> void:
+	if hero.is_moving:
+		return
+	_dbg_enter("[LOCATION_ENTER_ATTEMPT] cur_junc=%s cur_loc=%s pos=(%.0f,%.0f)" \
+		% [_v2_current_junction, current_location, hero.global_position.x, hero.global_position.y])
+	var here := _resolve_enter_junction()
+	if here == "":
+		_dbg_enter("[LOCATION_ENTER_BLOCKED] reason=no_junction")
+		return
+	var enter_loc: String = ROAD_JUNCTIONS.get(here, "")
+	if enter_loc == "":
+		_dbg_enter("[LOCATION_ENTER_BLOCKED] reason=junction_no_location junction=%s" % here)
+		return
+	if not (discovered.get(enter_loc, false) as bool):
+		_dbg_enter("[LOCATION_ENTER_BLOCKED] reason=not_discovered loc=%s" % enter_loc)
+		return
+	_dbg_enter("[LOCATION_ENTER_OK] id=%s" % enter_loc)
+	_v2_enter_location(enter_loc)
+
+func _dbg_enter(msg: String) -> void:
+	if DEBUG_LOCATION_ENTER:
+		print(msg)
+
+## Узел для входа по E — где герой СЕЙЧАС стоит, выбирается по УЗЛУ/ЛОКАЦИИ, а не по
+## дистанции до картинки (устойчиво к offset junction↔building у Лесопилки). Приоритет:
+## фактический junction рядом → кэш _v2_current_junction → junction отображаемого
+## current_location, если герой рядом (на случай, если кэш сбросил click-промах).
+func _resolve_enter_junction() -> String:
+	var here := _v2_junction_at(hero.global_position)
+	if here != "":
+		return here
+	if _v2_current_junction != "":
+		return _v2_current_junction
+	var cj := _v2_junction_for_location(current_location)
+	if cj != "" and hero.global_position.distance_to(_v2_get_junction_pos(cj)) < V2_TARGET_CLICK_R:
+		return cj
+	return ""
 
 ## V2 владеет вводом, пока герой в V2-зоне: стоит на junction-якоре, идёт по ребру
 ## ("_v2road_..." в hero.target_location), либо физически на V2-узле. Тогда map-click
@@ -1374,8 +1429,8 @@ func _draw() -> void:
 	_draw_fog_markers()
 	_draw_locked_seals()
 
-## Phase 3B: рендер fog direction markers + дедуп-лог [FOG_MARKER_SHOW] (один раз
-## при изменении набора, не каждый кадр). Placeholder-арт: кружок+пульс.
+## Phase 3B/5C-2: дедуп-лог [FOG_MARKER_SHOW] (один раз при изменении набора).
+## Визуал guide-маркера рисует _draw_guide_overlay (CanvasLayer выше тумана).
 func _draw_fog_markers() -> void:
 	var markers := _compute_fog_markers()
 	var keys: Array = []
@@ -1388,12 +1443,69 @@ func _draw_fog_markers() -> void:
 		var here := _v2_junction_at(hero.global_position)
 		for m2: Dictionary in markers:
 			print("[FOG_MARKER_SHOW] from=%s to=%s" % [here, str(m2["target"])])
-	var t := Time.get_ticks_msec() * 0.004
-	var pulse := 0.5 + 0.5 * sin(t)
-	for m3: Dictionary in markers:
-		var pos: Vector2 = m3["pos"]
-		draw_circle(pos, 10.0, Color(1.0, 0.7, 0.2, 0.9))
-		draw_arc(pos, 14.0 + pulse * 4.0, 0.0, TAU, 32, Color(1.0, 0.85, 0.4, 0.8), 2.0)
+	# Визуал маркера перенесён в _draw_guide_overlay (CanvasLayer выше тумана), т.к.
+	# рисование в _draw() оказывается ПОД FogOverlay. Здесь — только дедуп-лог выше.
+
+## 5C-2: CanvasLayer (layer=10) выше FogOverlay (UI=1) + Control для рисования
+## guide-маркера в экранных координатах. Только рантайм, Main.tscn не трогаем.
+func _setup_guide_overlay() -> void:
+	_guide_layer = CanvasLayer.new()
+	_guide_layer.layer = 10
+	add_child(_guide_layer)
+	_guide_ctrl = Control.new()
+	_guide_ctrl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_guide_ctrl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_guide_layer.add_child(_guide_ctrl)
+	_guide_ctrl.draw.connect(_draw_guide_overlay)
+
+## Мир -> экран через камеру (учёт zoom/offset/limits), как в MapDebugOverlay.
+func _w2s(world: Vector2) -> Vector2:
+	var vp := get_viewport().get_visible_rect().size
+	return (world - camera.get_screen_center_position()) * camera.zoom.x + vp * 0.5
+
+## Имя по наведению разрешено ТОЛЬКО для discovered. Available next-step имя уже
+## показывает guide-маркер выше тумана — второй hover-тултип был бы дублем.
+## Hidden/future/locked — молчат.
+func _hover_name_allowed(id: String) -> bool:
+	return discovered.get(id, false) as bool
+
+## 5C-2 guide-маркер ВЫШЕ тумана: для current available next-step — тёплый огонёк +
+## ореол-пульс + стрелка к цели + имя. Рисуется на _guide_ctrl в screen coords.
+## Hidden/future/locked не раскрываются (только цели из _compute_fog_markers).
+func _draw_guide_overlay() -> void:
+	if not is_instance_valid(_guide_ctrl) or hero == null:
+		return
+	var now := Time.get_ticks_msec()
+	for m: Dictionary in _compute_fog_markers():
+		var tgt := str(m["target"])
+		var loc: String = ROAD_JUNCTIONS.get(tgt, "")
+		var sp := _w2s(m["pos"])
+		var dvec := _w2s(_v2_get_junction_pos(tgt)) - sp
+		var dir := dvec.normalized() if dvec.length() > 1.0 else Vector2.RIGHT
+		var ph := float(tgt.hash() % 1000) * 0.001 * TAU
+		var flick := 0.6 + 0.4 * sin(now * 0.006 + ph)
+		# тёплый ореол-пульс
+		_guide_ctrl.draw_circle(sp, 16.0 + 5.0 * flick, Color(1.0, 0.7, 0.25, 0.18))
+		# пламя: внешний контур + яркое ядро
+		_guide_ctrl.draw_colored_polygon(PackedVector2Array([
+			sp + Vector2(0.0, -15.0), sp + Vector2(-7.0, 5.0), sp + Vector2(7.0, 5.0),
+		]), Color(1.0, 0.62, 0.16, 0.97))
+		_guide_ctrl.draw_colored_polygon(PackedVector2Array([
+			sp + Vector2(0.0, -9.0), sp + Vector2(-3.0, 4.0), sp + Vector2(3.0, 4.0),
+		]), Color(1.0, 0.95, 0.65, 0.6 + 0.4 * flick))
+		# стрелка к цели
+		var ap := sp + dir * 17.0
+		var perp := Vector2(-dir.y, dir.x) * 5.5
+		_guide_ctrl.draw_colored_polygon(PackedVector2Array([
+			ap + dir * 8.0, ap + perp, ap - perp,
+		]), Color(1.0, 0.82, 0.34, 0.9))
+		# имя цели (тень + тёплый) — только available next-step
+		if loc != "":
+			var lp := sp + Vector2(12.0, -16.0)
+			_guide_ctrl.draw_string(ThemeDB.fallback_font, lp + Vector2(1.0, 1.0), _title(loc),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.0, 0.0, 0.0, 0.9))
+			_guide_ctrl.draw_string(ThemeDB.fallback_font, lp, _title(loc),
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(1.0, 0.93, 0.72, 1.0))
 
 func _draw_roads() -> void:
 	var drawn: Dictionary = {}
@@ -1460,8 +1572,7 @@ func _draw_waypoints() -> void:
 		# и false-clickable). Направление к скрытым V2-соседям несут Fog Direction
 		# Markers — не дублируем marker + blob. Прочее — тусклая hidden-точка.
 		if not is_disc:
-			draw_circle(pos, 8.0, Color(0.3, 0.3, 0.3, 0.3))
-			continue
+			continue   # 5C-2: hidden/locked/future — НИЧЕГО (имя/точки не рисуем; путь ведёт fog-marker)
 
 		var color: Color
 		if is_cur:        color = Color(0.2, 0.55, 1.0, 1.0)   # синий — текущая
