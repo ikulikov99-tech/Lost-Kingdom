@@ -8,12 +8,9 @@
 
 extends Control
 
-const ACTIVE_PATHS := [
-	"CastleVillagePath", "VillageDockPath", "VillageLumbermillPath",
-	"LumbermillMinePath", "DockKnightRuinsPath", "KnightRuinsMageTowerPath",
-	"KnightRuinsEarthMagePath",
-]
-const DISABLED_PATHS := ["VillageRuinsPath", "EarthMageDarkCastlePath"]
+# Дороги для F3: active = реальные сегменты Main.ROAD_SEGMENTS_V2 (источник правды,
+# чтобы overlay не расходился с навигацией). Остальные Path2D сцены = не в V2.
+# Списки имён больше НЕ хардкодим (раньше было 7 «active» при 3 реальных в V2).
 
 # Радиусы из fog_mask.gdshader — только для визуализации
 const REVEAL_R    := 135.0
@@ -55,12 +52,18 @@ func _draw() -> void:
 	var zoom: float = _cam.zoom.x
 	var font := ThemeDB.fallback_font
 
-	# 1. Активные дороги (жёлтые)
-	for n: String in ACTIVE_PATHS:
-		_draw_path(n, Color(1.0, 0.85, 0.2, 0.95), 2.0)
-	# 2. Отключённые/будущие (фиолетовые, тоньше)
-	for n: String in DISABLED_PATHS:
-		_draw_path(n, Color(0.7, 0.35, 1.0, 0.7), 1.5)
+	# 1+2. Дороги: жёлтые = реальные V2-сегменты (Main.ROAD_SEGMENTS_V2),
+	# фиолетовые/тоньше = прочие Path2D сцены (не в V2). Перебираем сами узлы
+	# сцены — список не дрейфует от графа.
+	var v2_active := _v2_active_path_names()
+	for child: Node in _main.get_children():
+		if not (child is Path2D):
+			continue
+		var pname := str(child.name)
+		if v2_active.has(pname):
+			_draw_path(pname, Color(1.0, 0.85, 0.2, 0.95), 2.0)
+		else:
+			_draw_path(pname, Color(0.7, 0.35, 1.0, 0.7), 1.5)
 
 	var wp: Dictionary = _main.WAYPOINTS
 	var rc: Dictionary = _main.REVEAL_CENTERS
@@ -111,9 +114,17 @@ func _draw() -> void:
 		draw_circle(_w2s(tp), 4.0, Color(1.0, 0.0, 1.0, 0.9))
 
 	# Легенда
-	var legend := "[F3] жёлт=road  фиол=disabled  оранж=reveal  зел=trail_r  жёлт.круг=hero"
+	var legend := "[F3] жёлт=V2 active (%d)  фиол=не в V2  оранж=reveal  зел=trail_r  жёлт.круг=hero" % v2_active.size()
 	draw_string(font, Vector2(20, 120), legend,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1, 1, 1, 0.9))
+
+## Имена Path2D-узлов реальных V2-сегментов (источник правды — Main.ROAD_SEGMENTS_V2),
+## чтобы F3-overlay помечал «active» ровно проходимые рёбра, не больше.
+func _v2_active_path_names() -> Array:
+	var out: Array = []
+	for seg: Array in _main.ROAD_SEGMENTS_V2:
+		out.append(str(seg[2]))
+	return out
 
 func _draw_path(node_name: String, col: Color, width: float) -> void:
 	var p := _main.get_node_or_null(node_name) as Path2D
