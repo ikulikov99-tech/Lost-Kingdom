@@ -150,6 +150,18 @@ const HERO_VISIBLE_R   := 110.0
 const ARRIVAL_RADIUS   := 60.0
 # Phase 3B: радиус клика по fog direction marker (кликабельная точка на дороге)
 const FOG_MARKER_CLICK_R := 26.0
+const LOCKED_SEAL_CLICK_R := 22.0
+const DEBUG_LOCKED := false   # [LOCKED_SEAL_*] логи под флагом (по умолчанию выкл)
+# 5C-1 Locked seals: графовый сосед без V2-сегмента = запечатан. Path2D — по имени узла.
+const LOCKED_EDGES := {
+	"Village": [
+		{ "to": "Dock",        "path": "VillageDockPath" },
+		{ "to": "KnightRuins", "path": "VillageRuinsPath" },
+	],
+	"Mine": [
+		{ "to": "EarthMageCastle", "path": "EarthMageCastleMineMainPath" },
+	],
+}
 # V2 target-node: радиус «клик попал в зону узла назначения / его иконки». Клик в
 # пределах этого расстояния от соседнего junction ИЛИ его иконки = команда идти к
 # нему. Дальше всех соседей — V2 не начинает движение (решает старая навигация).
@@ -209,6 +221,8 @@ var _v2_road_target_off := 0.0                   # offset конца ребра 
 
 # Phase 3B: предыдущий набор fog-маркеров (для дедупа лога [FOG_MARKER_SHOW]).
 var _last_marker_set := ""
+var _last_seal_set := ""          # дедуп [LOCKED_SEAL_SHOW]
+var _locked_msg_until := 0.0      # до этого времени (ms) показываем «Запечатано»
 
 # Визуальная настройка карты: Marker2D в Main.tscn под MapTuningMarkers.
 # Если маркер есть — берём его global_position; иначе fallback на константы
@@ -394,30 +408,42 @@ func _input(event: InputEvent) -> void:
 				_v2_travel_to(str(m["target"]))
 				return
 
-		# ── V2 ВЛАДЕЕТ ВВОДОМ: пока герой в V2-зоне, map-click обрабатывает ТОЛЬКО
-		#    target-node навигация. Вход в локацию с карты отключён (только клавиша E).
-		#    Старый fallback (ниже) физически не вызывается — перехватить клик нечем.
-		if _v2_has_input_control():
-			var v2_click_vec := world_pos - hero.global_position
-			var v2_dir := v2_click_vec.normalized() if v2_click_vec.length() > 1.0 else Vector2.ZERO
-			if not _v2_try_road_click(world_pos, v2_dir):
-				print("[ROADGRAPH_V2_SKIP] reason=no_v2_target")
+		# Остальной диспатч клика (locked / V2 / иконка / дорога) — в _dispatch_map_click,
+		# чтобы _input не превышал gdlint max-returns. Логика НЕ изменена, только вынесена.
+		_dispatch_map_click(world_pos)
+		return
+
+## Диспатч ЛКМ-клика после fog-маркеров: locked-печать → V2-навигация → вход по иконке
+## (fallback) → шаг по дороге (fallback). Вынесено из _input без изменения логики.
+func _dispatch_map_click(world_pos: Vector2) -> void:
+	# LOCKED SEAL (5C-1): клик по печати = «Запечатано», герой НЕ двигается.
+	for s: Dictionary in _compute_locked_seals():
+		if world_pos.distance_to(s["pos"]) <= LOCKED_SEAL_CLICK_R:
+			if DEBUG_LOCKED:
+				print("[LOCKED_SEAL_CLICK] to=%s" % str(s["to"]))
+			_locked_msg_until = Time.get_ticks_msec() + 1200.0
 			return
 
-		# 2) ВХОД В ЛОКАЦИЮ = явный клик ПО ИКОНКЕ (старый путь / fallback). Малый
-		#    радиус ICON_CLICK_R: входим только при клике строго по табличке. Работает
-		#    и когда герой стоит на дороге у узла (иконка уже в свету). Клик по дороге
-		#    внутрь локации не заводит.
-		var clicked := _find_accessible_waypoint(world_pos, ICON_CLICK_R)
-		if clicked != "" and ((discovered.get(clicked, false) as bool) \
-				or _is_road_point_visible(_pos(clicked))):
-			_enter_location_click(clicked)
-			return
+	# V2 ВЛАДЕЕТ ВВОДОМ: пока герой в V2-зоне, map-click — только target-node навигация.
+	# Вход в локацию с карты отключён (только клавиша E). Старый fallback ниже физически
+	# не вызывается, пока V2 владеет вводом.
+	if _v2_has_input_control():
+		var v2_click_vec := world_pos - hero.global_position
+		var v2_dir := v2_click_vec.normalized() if v2_click_vec.length() > 1.0 else Vector2.ZERO
+		if not _v2_try_road_click(world_pos, v2_dir):
+			print("[ROADGRAPH_V2_SKIP] reason=no_v2_target")
+		return
 
-		# 2) Иначе — шаг по дороге в сторону клика. НИКОГДА не входит в локацию:
-		#    проход мимо узла/развилки без засасывания сразу на ВСЕХ узлах.
-		if _try_road_click(world_pos):
-			return
+	# ВХОД В ЛОКАЦИЮ = клик ПО ИКОНКЕ (старый путь / fallback, ICON_CLICK_R).
+	var clicked := _find_accessible_waypoint(world_pos, ICON_CLICK_R)
+	if clicked != "" and ((discovered.get(clicked, false) as bool) \
+			or _is_road_point_visible(_pos(clicked))):
+		_enter_location_click(clicked)
+		return
+
+	# Иначе — шаг по дороге в сторону клика (старый fallback). В локацию не входит.
+	if _try_road_click(world_pos):
+		return
 
 func _physics_process(_delta: float) -> void:
 	_push_camera_to_fog()
@@ -452,14 +478,19 @@ func _process(_delta: float) -> void:
 	# Резервное обновление тумана на случай кадров без physics_process
 	_push_camera_to_fog()
 
-	# Тултип
-	var hovered := _find_any_waypoint(get_global_mouse_position(), 60.0)
-	if hovered != "":
-		tooltip_label.text    = _title(hovered)
-		tooltip_label.visible = true
+	# Тултип (locked-фидбек «Запечатано» имеет приоритет, пока активен)
+	if Time.get_ticks_msec() < _locked_msg_until:
+		tooltip_label.text     = "Запечатано"
+		tooltip_label.visible  = true
 		tooltip_label.position = get_viewport().get_mouse_position() + Vector2(12, -28)
 	else:
-		tooltip_label.visible = false
+		var hovered := _find_any_waypoint(get_global_mouse_position(), 60.0)
+		if hovered != "":
+			tooltip_label.text    = _title(hovered)
+			tooltip_label.visible = true
+			tooltip_label.position = get_viewport().get_mouse_position() + Vector2(12, -28)
+		else:
+			tooltip_label.visible = false
 
 	if not hero.is_moving:
 		queue_redraw()
@@ -921,6 +952,74 @@ func _v2_travel_to(target_junction: String) -> bool:
 	print("[ROADGRAPH_V2_CLICK] from=%s to=%s path=%s" % [here, target_junction, path.name])
 	return _v2_walk_segment(path, here, target_junction)
 
+## 5C-1: locked seals от ТЕКУЩЕГО junction. Для графовых соседей без V2-сегмента
+## (LOCKED_EDGES) — печать на дороге у края тумана. Только чтение. [{to, pos}].
+func _compute_locked_seals() -> Array:
+	var out: Array = []
+	if hero.is_moving:
+		return out
+	var here := _v2_junction_at(hero.global_position)
+	if here == "":
+		return out
+	var here_loc: String = ROAD_JUNCTIONS.get(here, "")
+	if here_loc == "" or not (discovered.get(here_loc, false) as bool):
+		return out
+	for edge: Dictionary in LOCKED_EDGES.get(here_loc, []):
+		var path := get_node_or_null(NodePath(str(edge["path"]))) as Path2D
+		if path == null or path.curve == null:
+			continue
+		var spos := _locked_seal_pos(path, _v2_get_junction_pos(here), _pos(str(edge["to"])))
+		if spos == Vector2.INF:
+			continue
+		out.append({ "to": str(edge["to"]), "pos": spos })
+	return out
+
+## Точка печати на дороге from→to: последняя ВИДИМАЯ точка кривой к соседу (край
+## тумана). Зеркалит логику _fog_marker_pos, fog-маркеры не трогает. INF если нет кривой.
+func _locked_seal_pos(path: Path2D, from_pos: Vector2, to_pos: Vector2) -> Vector2:
+	var curve := path.curve
+	var total := curve.get_baked_length()
+	if total <= 0.0:
+		return Vector2.INF
+	var from_off := curve.get_closest_offset(path.to_local(from_pos))
+	var to_off := curve.get_closest_offset(path.to_local(to_pos))
+	var dir := 1.0 if to_off >= from_off else -1.0
+	var last_vis := path.to_global(curve.sample_baked(from_off))
+	var off := from_off
+	while (dir > 0.0 and off < to_off) or (dir < 0.0 and off > to_off):
+		off += dir * 24.0
+		var p := path.to_global(curve.sample_baked(clampf(off, 0.0, total)))
+		if _is_road_point_visible(p):
+			last_vis = p
+		else:
+			break
+	return last_vis
+
+## 5C-1: рендер locked-печатей (placeholder, НЕ круг): столб + цепь поперёк дороги +
+## холодно-красная трещина-руна, медленный пульс. Финальный арт — отдельный polish.
+func _draw_locked_seals() -> void:
+	var seals := _compute_locked_seals()
+	if DEBUG_LOCKED:
+		var keys: Array = []
+		for s: Dictionary in seals:
+			keys.append(str(s["to"]))
+		keys.sort()
+		var set_id := ",".join(keys)
+		if set_id != _last_seal_set:
+			_last_seal_set = set_id
+			var here := _v2_junction_at(hero.global_position)
+			for s2: Dictionary in seals:
+				print("[LOCKED_SEAL_SHOW] from=%s to=%s" % [here, str(s2["to"])])
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.0016)
+	for s3: Dictionary in seals:
+		var pos: Vector2 = s3["pos"]
+		draw_line(pos + Vector2(0.0, 11.0), pos + Vector2(0.0, -14.0),
+			Color(0.32, 0.28, 0.30, 0.9), 3.0)                 # столб
+		draw_line(pos + Vector2(-12.0, 0.0), pos + Vector2(12.0, 0.0),
+			Color(0.55, 0.55, 0.60, 0.85), 2.0)                # цепь поперёк дороги
+		draw_line(pos + Vector2(-5.0, -9.0), pos + Vector2(4.0, 1.0),
+			Color(0.62, 0.12, 0.16, 0.4 + 0.35 * pulse), 2.0)  # трещина-руна (пульс)
+
 ## DIRECTION-STEP: клик РЯДОМ С ГЕРОЕМ задаёт НАПРАВЛЕНИЕ (click_dir), а не точку на
 ## карте. Выбираем активную дорогу/ветку, направление к концу которой лучше совпадает с
 ## click_dir (на развилке — любую из сходящихся, оба конца — кандидаты на dest). Затем
@@ -1273,6 +1372,7 @@ func _draw() -> void:
 	_draw_roads()
 	_draw_waypoints()
 	_draw_fog_markers()
+	_draw_locked_seals()
 
 ## Phase 3B: рендер fog direction markers + дедуп-лог [FOG_MARKER_SHOW] (один раз
 ## при изменении набора, не каждый кадр). Placeholder-арт: кружок+пульс.
