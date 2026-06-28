@@ -1288,27 +1288,36 @@ func _draw_roads() -> void:
 
 func _draw_waypoints() -> void:
 	var t := Time.get_ticks_msec() * 0.003
+	# Текущий V2-узел героя — ИСТОЧНИК визуальной доступности (зелёное/кликабельное).
+	# Старый ROUTES/_is_accessible как источник для V2-режима НЕ используем (Phase 5A).
+	var here := _v2_junction_at(hero.global_position)
+	if here == "":
+		here = _v2_current_junction
+	var v2_adj: Array = _v2_adjacent_junctions(here) if here != "" else []
 	for id in WAYPOINTS.keys():
 		var pos          := _pos(id)
 		var is_disc: bool = discovered.get(id, false)
-		var is_avail: bool = available.get(id, false)
 		var is_cur: bool  = (id == current_location)
-		var is_acc: bool  = _is_accessible(id)
+		# Зелёное «доступно» — только реальный V2-сосед текущего узла, не ROUTES.
+		var jid := _v2_junction_for_location(id)
+		var is_v2acc: bool = _v2_enabled and jid != "" and v2_adj.has(jid)
 
-		if not is_disc and not is_avail:
+		# Не discovered → НИКАКИХ ярких кругов/колец под туманом (фикс available-блобов
+		# и false-clickable). Направление к скрытым V2-соседям несут Fog Direction
+		# Markers — не дублируем marker + blob. Прочее — тусклая hidden-точка.
+		if not is_disc:
 			draw_circle(pos, 8.0, Color(0.3, 0.3, 0.3, 0.3))
 			continue
 
 		var color: Color
-		if is_cur:         color = Color(0.2, 0.55, 1.0, 1.0)   # синий — текущая
-		elif is_acc:       color = Color(0.15, 0.9, 0.25, 1.0)  # зелёный — кликабельная
-		elif is_disc:      color = Color(0.7, 0.65, 0.3, 0.75)  # жёлтый — посещённая
-		else:              color = Color(0.5, 0.5, 0.5, 0.5)    # серый — available но не соседняя
+		if is_cur:        color = Color(0.2, 0.55, 1.0, 1.0)   # синий — текущая
+		elif is_v2acc:    color = Color(0.15, 0.9, 0.25, 1.0)  # зелёный — V2-достижимая
+		else:             color = Color(0.7, 0.65, 0.3, 0.75)  # жёлтый — посещённая
 
 		draw_circle(pos, 20.0, color)
 		draw_arc(pos, 26.0, 0.0, TAU, 40, Color(1, 1, 1, 0.85), 2.5)
 
-		if is_acc and not hero.is_moving:
+		if is_v2acc and not hero.is_moving:
 			var pulse := 0.5 + 0.5 * sin(t + pos.x * 0.01)
 			draw_arc(pos, 32.0 + pulse * 6.0, 0.0, TAU, 40,
 					 Color(0.3, 1.0, 0.4, 0.55 * pulse), 2.0)
