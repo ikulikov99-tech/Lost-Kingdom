@@ -1335,6 +1335,11 @@ func _draw_roads() -> void:
 			for i in range(pts.size() - 1):
 				draw_line(pts[i], pts[i + 1], col, 4.0)
 
+## Рисовать ли название локации id: только для discovered (production-гейт титула).
+## Вынесено именованным предикатом для юнит-теста; поведение = прежний is_disc.
+func _should_draw_title(id: String) -> bool:
+	return discovered.get(id, false) as bool
+
 func _draw_waypoints() -> void:
 	var t := Time.get_ticks_msec() * 0.003
 	# Текущий V2-узел героя — ИСТОЧНИК визуальной доступности (зелёное/кликабельное).
@@ -1371,7 +1376,7 @@ func _draw_waypoints() -> void:
 			draw_arc(pos, 32.0 + pulse * 6.0, 0.0, TAU, 40,
 					 Color(0.3, 1.0, 0.4, 0.55 * pulse), 2.0)
 
-		if is_disc:
+		if _should_draw_title(id):
 			draw_string(ThemeDB.fallback_font,
 				pos + Vector2(-40, 40), _title(id),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
