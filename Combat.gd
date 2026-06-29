@@ -16,6 +16,11 @@ const HERO_RADIUS := 23.0          # радиус тела примитива
 const HERO_CLAMP_R := 30.0         # отступ центра от границы арены (тело + ореол)
 const ARENA_MARGIN := 40.0         # отступ арены от краёв экрана (= граница движения)
 
+# ── бандиты (Step 2B: ТОЛЬКО спавн + преследование по прямой; без атаки/HP/смерти) ──
+const BANDIT_SPEED := 150.0        # px/сек, медленнее героини → её можно увести
+const BANDIT_RADIUS := 18.0
+const BANDIT_CLAMP_R := 24.0       # отступ центра бандита от границы арены
+
 var _title: Label
 var _hint: Label
 var _action_btn: Button
@@ -24,6 +29,9 @@ var _returning := false
 
 var _hero: Node2D
 var _hero_pos: Vector2 = Vector2.ZERO   # центр героини в координатах сцены
+
+var _bandits: Array[Node2D] = []        # узлы-бандиты; позиция = .position
+var _count_label: Label
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -36,6 +44,7 @@ func _ready() -> void:
 	add_child(bg)
 
 	_build_arena()
+	_spawn_bandits()   # до героини и UI: z-порядок арена < бандиты < героиня < UI
 	_build_hero()
 	_build_ui()
 
@@ -119,6 +128,13 @@ func _build_ui() -> void:
 	_hint.add_theme_font_size_override("font_size", 20)
 	top.add_child(_hint)
 
+	_count_label = Label.new()
+	_count_label.text = "Бандитов: %d" % _bandits.size()
+	_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_count_label.add_theme_font_size_override("font_size", 22)
+	_count_label.add_theme_color_override("font_color", Color(0.95, 0.6, 0.55, 1.0))
+	top.add_child(_count_label)
+
 	var bottom := CenterContainer.new()
 	bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom.offset_top = -(ARENA_MARGIN + 78.0)
@@ -146,6 +162,8 @@ func _process(delta: float) -> void:
 		_hero_pos += dir.normalized() * HERO_SPEED * delta
 		_clamp_hero()
 		_hero.position = _hero_pos
+	if not _won:
+		_move_bandits(delta)
 
 ## Сумма WASD + стрелок (физические клавиши — не зависят от раскладки). Диагональ
 ## нормализуется в _process, поэтому все 8 направлений равны по скорости.
@@ -163,10 +181,66 @@ func _read_move_input() -> Vector2:
 
 ## Держать центр героини внутри арены (с учётом тела/ореола).
 func _clamp_hero() -> void:
+	_hero_pos = _clamp_to_arena(_hero_pos, HERO_CLAMP_R)
+
+## Зажать точку внутри арены с отступом r (общий хелпер для героини и бандитов).
+func _clamp_to_arena(p: Vector2, r: float) -> Vector2:
 	var vp := get_viewport_rect().size
-	var r := HERO_CLAMP_R
-	_hero_pos.x = clampf(_hero_pos.x, ARENA_MARGIN + r, vp.x - ARENA_MARGIN - r)
-	_hero_pos.y = clampf(_hero_pos.y, ARENA_MARGIN + r, vp.y - ARENA_MARGIN - r)
+	return Vector2(
+		clampf(p.x, ARENA_MARGIN + r, vp.x - ARENA_MARGIN - r),
+		clampf(p.y, ARENA_MARGIN + r, vp.y - ARENA_MARGIN - r))
+
+## Спавн 3 бандитов в фиксированных точках у КРАЁВ арены (визуально «из края/тумана»,
+## без нового арта). Только появление — атаки/HP/смерти нет (Step 2B).
+func _spawn_bandits() -> void:
+	var vp := get_viewport_rect().size
+	var edge := ARENA_MARGIN + BANDIT_CLAMP_R
+	var points: Array[Vector2] = [
+		Vector2(edge, vp.y * 0.30),            # левый край
+		Vector2(vp.x - edge, vp.y * 0.42),     # правый край
+		Vector2(vp.x * 0.5, edge),             # верхний край
+	]
+	for p: Vector2 in points:
+		var b := _make_bandit()
+		b.position = p
+		add_child(b)
+		_bandits.append(b)
+	print("[COMBAT_STEP2B] spawned bandits=%d" % _bandits.size())
+
+## Бандит — примитив, читаемо отличается от героини (тёмно-красный, меньше круг) +
+## мягкая «дымка» по краю вместо нового арта (намёк на выход из тумана).
+func _make_bandit() -> Node2D:
+	var n := Node2D.new()
+
+	var fog := Polygon2D.new()
+	fog.polygon = _circle_points(BANDIT_RADIUS + 12.0, 24)
+	fog.color = Color(0.20, 0.18, 0.26, 0.35)
+	n.add_child(fog)
+
+	var body := Polygon2D.new()
+	body.polygon = _circle_points(BANDIT_RADIUS, 24)
+	body.color = Color(0.74, 0.22, 0.20, 1.0)
+	n.add_child(body)
+
+	var loop := _circle_points(BANDIT_RADIUS, 24)
+	loop.append(loop[0])
+	var outline := Line2D.new()
+	outline.points = loop
+	outline.width = 2.0
+	outline.default_color = Color(0.10, 0.04, 0.04, 1.0)
+	outline.joint_mode = Line2D.LINE_JOINT_ROUND
+	n.add_child(outline)
+
+	return n
+
+## Бандиты идут по ПРЯМОЙ к героине (без pathfinding). Преследуют, пока она движется.
+## Урона/смерти/коллизий нет — только движение (Step 2B).
+func _move_bandits(delta: float) -> void:
+	for b: Node2D in _bandits:
+		var to_hero := _hero_pos - b.position
+		if to_hero.length() > 1.0:
+			b.position += to_hero.normalized() * BANDIT_SPEED * delta
+		b.position = _clamp_to_arena(b.position, BANDIT_CLAMP_R)
 
 ## Кнопка/Enter: в бою — завершить тест-бой (win); после победы — вернуться на карту.
 func _on_action() -> void:
