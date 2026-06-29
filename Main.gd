@@ -264,9 +264,13 @@ func _ready() -> void:
 	_update_ui()
 	_debug_state("_ready")
 	_verify_roadgraph_v2()
-	# Старт забега: один запуск карты = один run (Phase 4A). Позже старт привяжем
-	# к «выходу из Castle», конец — к смерти/возврату.
-	RunState.start_run()
+	# Возврат с боя (bandit_ambush Step 1) НЕ начинает новый run — иначе сбросились бы
+	# fired_encounters и та же засада сработала бы снова (бесконечный цикл). Иначе —
+	# обычный старт забега: один запуск карты = один run (Phase 4A).
+	if RunState.return_pending:
+		_restore_after_encounter()
+	else:
+		RunState.start_run()
 	_setup_guide_overlay()
 	queue_redraw()
 
@@ -477,6 +481,68 @@ func _check_road_encounters() -> void:
 		if absf(ratio - float(enc["at_ratio"])) <= ROAD_ENCOUNTER_BAND:
 			print("[ROAD_ENCOUNTER] type=%s segment=%s" % [eid, _v2_road_path.name])
 			RunState.mark_fired(eid)
+			_begin_road_encounter(eid, ratio)
+			return
+
+## bandit_ambush Step 1: засада сработала → сохранить return-контекст в RunState и
+## уйти в боевую сцену. Смена сцены ОТЛОЖЕННАЯ (call_deferred) — нельзя менять дерево
+## во время physics_process. Карта восстановится в Main._ready по этому контексту.
+func _begin_road_encounter(encounter_id: String, ratio: float) -> void:
+	RunState.begin_encounter({
+		"encounter": encounter_id,
+		"segment": _v2_road_path.name,
+		"ratio": ratio,
+		"hero_pos": hero.global_position,
+		"location": current_location,
+		"junction": _v2_current_junction,
+		"discovered": discovered.duplicate(true),
+	})
+	get_tree().call_deferred("change_scene_to_file", "res://Combat.tscn")
+
+## Возврат с боевой сцены: восстановить карту по снимку из RunState (discovered,
+## герой, локация, туман) БЕЗ сброса прогресса. Парный лог к [ROAD_ENCOUNTER].
+## Герой ставится примерно в точку засады; путь/туман/discovered не теряются.
+func _restore_after_encounter() -> void:
+	discovered = RunState.return_discovered.duplicate(true)
+	# available пересчитываем из discovered (соседи открытых, кроме locked).
+	for id in available.keys():
+		available[id] = false
+	for loc in discovered.keys():
+		if not (discovered[loc] as bool):
+			continue
+		for neighbor in ROUTES.get(loc, []):
+			if not _is_locked(neighbor):
+				available[neighbor] = true
+	current_location = RunState.return_current_location
+	GameState.current_location = current_location
+	_v2_current_junction = RunState.return_current_junction
+	if RunState.return_hero_pos != Vector2.ZERO:
+		hero.global_position = RunState.return_hero_pos
+	# Туман: заново открыть все discovered-локации + точку героя (карта не «зарастает»).
+	for loc in discovered.keys():
+		if discovered[loc] as bool:
+			fog_overlay.reveal(_reveal_pos(loc))
+	fog_overlay.reveal(hero.global_position)
+	GameState.unlocked_locations = _get_discovered_list()
+	_update_ui()
+	print("[ROAD_ENCOUNTER_RESULT] id=%s result=%s reward=%s" \
+		% [RunState.return_encounter, RunState.last_combat_result, RunState.last_combat_reward])
+	# Авто-продолжение: герой стоял МЕЖДУ узлами, а V2 не подхватывает клик с середины
+	# дороги (застрял бы). Доводим оставшуюся часть прерванного сегмента до целевого
+	# узла. Засада уже в fired_encounters → второй раз не сработает.
+	var resume_origin: String = RunState.return_current_junction
+	var resume_dest := _v2_segment_other_end(RunState.return_segment, resume_origin)
+	var resume_path := get_node_or_null(NodePath(RunState.return_segment)) as Path2D
+	RunState.clear_return()
+	_debug_state("restored after encounter")
+	if resume_path != null and resume_dest != "":
+		call_deferred("_v2_resume_walk", resume_path, resume_origin, resume_dest)
+
+## Отложенный перезапуск V2-прохода после боя (вызывается из _restore_after_encounter
+## через call_deferred — дерево к тому моменту готово). Доводит героя до целевого узла.
+func _v2_resume_walk(path: Path2D, origin: String, dest: String) -> void:
+	print("[ROAD_ENCOUNTER_RESUME] segment=%s %s->%s" % [path.name, origin, dest])
+	_v2_walk_segment(path, origin, dest)
 
 func _process(_delta: float) -> void:
 	# Резервное обновление тумана на случай кадров без physics_process
@@ -752,6 +818,21 @@ func _v2_get_segment_path(a: String, b: String) -> Path2D:
 			if n != null and n is Path2D:
 				return n as Path2D
 	return null
+
+## Другой конец V2-сегмента (по имени Path2D) относительно origin-узла. "" если не
+## найден. Нужен для авто-продолжения пути после боя (куда вёл прерванный сегмент).
+func _v2_segment_other_end(segment_name: String, origin: String) -> String:
+	for seg: Array in ROAD_SEGMENTS_V2:
+		if str(seg[2]) != segment_name:
+			continue
+		var a := str(seg[0])
+		var b := str(seg[1])
+		if a == origin:
+			return b
+		if b == origin:
+			return a
+		return b   # origin неизвестен — дальний конец по умолчанию
+	return ""
 
 ## Соседние junction по сегментам V2.
 func _v2_adjacent_junctions(junction_id: String) -> Array:
