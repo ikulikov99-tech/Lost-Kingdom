@@ -16,10 +16,18 @@ const HERO_RADIUS := 23.0          # радиус тела примитива
 const HERO_CLAMP_R := 30.0         # отступ центра от границы арены (тело + ореол)
 const ARENA_MARGIN := 40.0         # отступ арены от краёв экрана (= граница движения)
 
-# ── бандиты (Step 2B: ТОЛЬКО спавн + преследование по прямой; без атаки/HP/смерти) ──
+# ── бандиты (Step 2B: спавн + преследование по прямой) ──
 const BANDIT_SPEED := 150.0        # px/сек, медленнее героини → её можно увести
 const BANDIT_RADIUS := 18.0
 const BANDIT_CLAMP_R := 24.0       # отступ центра бандита от границы арены
+const BANDIT_HP := 3               # Step 2C: бандит умирает с 3 ударов в радиусе
+
+# ── burst-атака героини (Step 2C: радиальный урон по таймеру; убивает бандитов;
+# урона по героине/HP героини/поражения НЕТ — это Step 3) ──
+const BURST_INTERVAL := 1.0        # сек между ударами
+const BURST_RADIUS := 80.0         # радиус поражения вокруг центра героини
+const BURST_DAMAGE := 1            # урон за удар
+const PULSE_TIME := 0.28           # сколько виден визуальный пульс удара
 
 var _title: Label
 var _hint: Label
@@ -30,8 +38,12 @@ var _returning := false
 var _hero: Node2D
 var _hero_pos: Vector2 = Vector2.ZERO   # центр героини в координатах сцены
 
-var _bandits: Array[Node2D] = []        # узлы-бандиты; позиция = .position
+var _bandits: Array[Node2D] = []        # узлы-бандиты; позиция = .position, HP в meta("hp")
 var _count_label: Label
+
+var _burst_ring: Line2D                 # визуальный круг удара (дочерний _hero)
+var _burst_accum := 0.0                 # накопитель таймера удара
+var _pulse_t := 0.0                     # остаток времени показа пульса
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -46,6 +58,7 @@ func _ready() -> void:
 	_build_arena()
 	_spawn_bandits()   # до героини и UI: z-порядок арена < бандиты < героиня < UI
 	_build_hero()
+	_build_burst_visual()
 	_build_ui()
 
 	_hero_pos = get_viewport_rect().size * 0.5
@@ -164,6 +177,8 @@ func _process(delta: float) -> void:
 		_hero.position = _hero_pos
 	if not _won:
 		_move_bandits(delta)
+		_update_burst(delta)
+	_update_pulse(delta)
 
 ## Сумма WASD + стрелок (физические клавиши — не зависят от раскладки). Диагональ
 ## нормализуется в _process, поэтому все 8 направлений равны по скорости.
@@ -231,6 +246,7 @@ func _make_bandit() -> Node2D:
 	outline.joint_mode = Line2D.LINE_JOINT_ROUND
 	n.add_child(outline)
 
+	n.set_meta("hp", BANDIT_HP)   # Step 2C: HP бандита хранится в метаданных узла
 	return n
 
 ## Бандиты идут по ПРЯМОЙ к героине (без pathfinding). Преследуют, пока она движется.
@@ -241,6 +257,67 @@ func _move_bandits(delta: float) -> void:
 		if to_hero.length() > 1.0:
 			b.position += to_hero.normalized() * BANDIT_SPEED * delta
 		b.position = _clamp_to_arena(b.position, BANDIT_CLAMP_R)
+
+## Кольцо-пульс burst-атаки (дочернее _hero → следует за героиней). Старт прозрачное.
+func _build_burst_visual() -> void:
+	_burst_ring = Line2D.new()
+	var loop := _circle_points(BURST_RADIUS, 36)
+	loop.append(loop[0])
+	_burst_ring.points = loop
+	_burst_ring.width = 4.0
+	_burst_ring.default_color = Color(0.98, 0.85, 0.35, 0.0)
+	_burst_ring.joint_mode = Line2D.LINE_JOINT_ROUND
+	_burst_ring.visible = false
+	_hero.add_child(_burst_ring)
+
+## Таймер burst: раз в BURST_INTERVAL наносим радиальный урон (пока есть кого бить).
+func _update_burst(delta: float) -> void:
+	if _bandits.is_empty():
+		return
+	_burst_accum += delta
+	if _burst_accum < BURST_INTERVAL:
+		return
+	_burst_accum = 0.0
+	_do_burst()
+
+## Один удар: урон всем бандитам в радиусе вокруг героини; убитые исчезают. Лог раз в
+## удар (не каждый кадр): [COMBAT_BURST] hits=N и [COMBAT_BANDIT_DEAD] remaining=N.
+func _do_burst() -> void:
+	_show_pulse()
+	var hits := 0
+	for b: Node2D in _bandits.duplicate():
+		if _hero_pos.distance_to(b.position) > BURST_RADIUS:
+			continue
+		hits += 1
+		var hp := int(b.get_meta("hp", BANDIT_HP)) - BURST_DAMAGE
+		b.set_meta("hp", hp)
+		if hp <= 0:
+			_bandits.erase(b)
+			b.queue_free()
+			print("[COMBAT_BANDIT_DEAD] remaining=%d" % _bandits.size())
+	print("[COMBAT_BURST] hits=%d" % hits)
+	_update_count()
+
+## Показать пульс удара (виден PULSE_TIME, затем затухает в _update_pulse).
+func _show_pulse() -> void:
+	_pulse_t = PULSE_TIME
+	_burst_ring.visible = true
+
+## Затухание визуального пульса (от яркого к прозрачному).
+func _update_pulse(delta: float) -> void:
+	if _pulse_t <= 0.0:
+		return
+	_pulse_t -= delta
+	var c := _burst_ring.default_color
+	c.a = clampf(_pulse_t / PULSE_TIME, 0.0, 1.0)
+	_burst_ring.default_color = c
+	if _pulse_t <= 0.0:
+		_burst_ring.visible = false
+
+## Обновить счётчик «Бандитов: N».
+func _update_count() -> void:
+	if _count_label != null:
+		_count_label.text = "Бандитов: %d" % _bandits.size()
 
 ## Кнопка/Enter: в бою — завершить тест-бой (win); после победы — вернуться на карту.
 func _on_action() -> void:
