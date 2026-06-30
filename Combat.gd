@@ -1,10 +1,11 @@
 extends Control
 
-## bandit_ambush Step 2A — боевая сцена с проверяемым ГЛАЗАМИ плейсхолдером.
-## Реального боя НЕТ (врагов/атаки/HP/урона/поражения — это Step 2B+/Step 3).
-## Здесь: героиня-примитив со свободным 8-directional движением (WASD/стрелки) внутри
-## процедурной арены (ColorRect/Panel, без картинок), читаемый UI и РУЧНОЕ завершение
-## боя (кнопка «Завершить бой (тест)» или Enter) — БЕЗ мгновенного авто-win по таймеру.
+## bandit_ambush Combat (Step 2A–2D, процедурно, без ассетов):
+##  • 2A — героиня-примитив, свободное 8-directional движение (WASD/стрелки) в арене;
+##  • 2B — 3 бандита спавнятся у краёв и идут к героине;
+##  • 2C — авто burst-атака вокруг героини (пульс-кольцо) наносит урон, бандиты с HP≤0 гибнут;
+##  • 2D — ПОБЕДА по зачистке всех бандитов (remaining==0) → авто-win; кнопка «Продолжить».
+## НЕ здесь (Step 3): HP/урон/поражение героини, элитный бандит, баланс, mouse-aim, снаряды.
 ## Контракт со Step 1 не тронут: победа = RunState.resolve_combat_win() + возврат на
 ## res://Main.tscn. Hero.gd НЕ переиспользуется (он привязан к дороге).
 
@@ -155,8 +156,9 @@ func _build_ui() -> void:
 	add_child(bottom)
 
 	_action_btn = Button.new()
-	_action_btn.text = "Завершить бой (тест)"
+	_action_btn.text = "Продолжить"
 	_action_btn.custom_minimum_size = Vector2(280.0, 46.0)
+	_action_btn.visible = false   # Step 2D: появляется ТОЛЬКО после зачистки бандитов
 	_action_btn.pressed.connect(_on_action)
 	bottom.add_child(_action_btn)
 
@@ -297,6 +299,9 @@ func _do_burst() -> void:
 			print("[COMBAT_BANDIT_DEAD] remaining=%d" % _bandits.size())
 	print("[COMBAT_BURST] hits=%d" % hits)
 	_update_count()
+	if _bandits.is_empty():
+		print("[COMBAT_VICTORY_CONDITION] bandits=0")
+		_win()
 
 ## Показать пульс удара (виден PULSE_TIME, затем затухает в _update_pulse).
 func _show_pulse() -> void:
@@ -319,21 +324,22 @@ func _update_count() -> void:
 	if _count_label != null:
 		_count_label.text = "Бандитов: %d" % _bandits.size()
 
-## Кнопка/Enter: в бою — завершить тест-бой (win); после победы — вернуться на карту.
+## Кнопка «Продолжить» (видна только после победы) → возврат на карту.
 func _on_action() -> void:
 	if _won:
 		_return_to_map()
-	else:
-		_win()
 
+## До победы ввод бой НЕ завершает (победа только зачисткой). После победы Enter/клик
+## = «Продолжить».
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_accept"):
-		_on_action()
+	if not _won:
 		return
-	if _won and event is InputEventMouseButton and event.pressed:
+	if event.is_action_pressed("ui_accept") \
+			or (event is InputEventMouseButton and event.pressed):
 		_return_to_map()
 
-## Ручная победа (Step 2A — бой всегда выигран). Step 1 контракт без изменений.
+## Победа по зачистке всех бандитов (Step 2D). Guard _won → награда не начисляется
+## дважды. Step 1 контракт без изменений (RunState.resolve_combat_win + возврат).
 func _win() -> void:
 	if _won:
 		return
@@ -342,7 +348,9 @@ func _win() -> void:
 	_title.text = "Победа!"
 	_hint.text = "Путь свободен. Награда: %s (заглушка). Нажми «Продолжить»." \
 		% RunState.last_combat_reward
-	_action_btn.text = "Продолжить"
+	if _count_label != null:
+		_count_label.visible = false
+	_action_btn.visible = true
 	_action_btn.grab_focus()
 
 func _return_to_map() -> void:
