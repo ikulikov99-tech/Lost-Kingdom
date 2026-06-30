@@ -1,13 +1,16 @@
 extends Control
 
-## bandit_ambush Combat (Step 2A–2D, процедурно, без ассетов):
+## bandit_ambush Combat (MVP v1, процедурно, без ассетов):
 ##  • 2A — героиня-примитив, свободное 8-directional движение (WASD/стрелки) в арене;
 ##  • 2B — 3 бандита спавнятся у краёв и идут к героине;
 ##  • 2C — авто burst-атака вокруг героини (пульс-кольцо) наносит урон, бандиты с HP≤0 гибнут;
-##  • 2D — ПОБЕДА по зачистке всех бандитов (remaining==0) → авто-win; кнопка «Продолжить».
-## НЕ здесь (Step 3): HP/урон/поражение героини, элитный бандит, баланс, mouse-aim, снаряды.
+##  • 2D — ПОБЕДА по зачистке всех бандитов (remaining==0) → авто-win; кнопка «Продолжить»;
+##  • MVP v1 — HP героини + контактный урон бандитов (с cooldown, flash) + ПОРАЖЕНИЕ
+##    при HP≤0 (бой стоп, «Повторить бой»). Победа/поражение взаимоисключают (guard-флаги).
+## НЕ здесь (Step 3): новые враги, элитный бандит, оружие/снаряды, mouse-aim, баланс.
 ## Контракт со Step 1 не тронут: победа = RunState.resolve_combat_win() + возврат на
-## res://Main.tscn. Hero.gd НЕ переиспользуется (он привязан к дороге).
+## res://Main.tscn. Поражение «Повторить бой» = reload сцены: карту/RunState не трогает,
+## дедуп засады (mark_fired в Main) уже выставлен. Hero.gd НЕ переиспользуется.
 
 const RETURN_SCENE := "res://Main.tscn"
 
@@ -30,14 +33,28 @@ const BURST_RADIUS := 80.0         # радиус поражения вокру�
 const BURST_DAMAGE := 1            # урон за удар
 const PULSE_TIME := 0.28           # сколько виден визуальный пульс удара
 
+# ── Combat MVP v1: HP героини, контактный урон бандитов, поражение ──
+const HERO_MAX_HP := 100
+const BANDIT_DAMAGE := 10                                  # урон за касание (с cooldown)
+const BANDIT_HIT_COOLDOWN := 0.7                           # сек паузы между ударами ОДНОГО бандита
+const HERO_HIT_RANGE := HERO_RADIUS + BANDIT_RADIUS + 4.0  # дистанция «касания» героини
+const HERO_FLASH_TIME := 0.18                              # длительность красного flash при попадании
+const HERO_BODY_COLOR := Color(0.97, 0.84, 0.33, 1.0)      # базовый цвет тела героини
+const HERO_HIT_COLOR := Color(0.95, 0.25, 0.20, 1.0)       # цвет flash при попадании
+
 var _title: Label
 var _hint: Label
 var _action_btn: Button
 var _won := false
+var _lost := false
 var _returning := false
 
 var _hero: Node2D
 var _hero_pos: Vector2 = Vector2.ZERO   # центр героини в координатах сцены
+var _hero_body: Polygon2D               # тело героини (для flash при попадании)
+var _hero_hp := HERO_MAX_HP
+var _hp_label: Label
+var _hero_flash_t := 0.0                # остаток времени красного flash
 
 var _bandits: Array[Node2D] = []        # узлы-бандиты; позиция = .position, HP в meta("hp")
 var _count_label: Label
@@ -98,10 +115,10 @@ func _build_hero() -> void:
 	halo.color = Color(0.98, 0.85, 0.35, 0.20)
 	_hero.add_child(halo)
 
-	var body := Polygon2D.new()
-	body.polygon = body_pts
-	body.color = Color(0.97, 0.84, 0.33, 1.0)
-	_hero.add_child(body)
+	_hero_body = Polygon2D.new()
+	_hero_body.polygon = body_pts
+	_hero_body.color = HERO_BODY_COLOR
+	_hero.add_child(_hero_body)
 
 	var outline := Line2D.new()
 	var loop := body_pts.duplicate()
@@ -137,10 +154,17 @@ func _build_ui() -> void:
 	top.add_child(_title)
 
 	_hint = Label.new()
-	_hint.text = "WASD / стрелки — движение\nEnter / кнопка — завершить тест боя"
+	_hint.text = "WASD / стрелки — движение. Выживай, пока burst убивает врагов."
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint.add_theme_font_size_override("font_size", 20)
 	top.add_child(_hint)
+
+	_hp_label = Label.new()
+	_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hp_label.add_theme_font_size_override("font_size", 22)
+	_hp_label.add_theme_color_override("font_color", Color(0.55, 0.9, 0.55, 1.0))
+	top.add_child(_hp_label)
+	_update_hp()
 
 	_count_label = Label.new()
 	_count_label.text = "Бандитов: %d" % _bandits.size()
@@ -173,14 +197,17 @@ func _circle_points(radius: float, segments: int) -> PackedVector2Array:
 ## Свободное 8-directional движение героини + удержание в границах арены.
 func _process(delta: float) -> void:
 	var dir := _read_move_input()
-	if dir != Vector2.ZERO:
+	if dir != Vector2.ZERO and not _lost:
 		_hero_pos += dir.normalized() * HERO_SPEED * delta
 		_clamp_hero()
 		_hero.position = _hero_pos
-	if not _won:
+	if not _won and not _lost:
 		_move_bandits(delta)
-		_update_burst(delta)
+		_apply_bandit_contact(delta)   # может вызвать _lose()
+		if not _lost:                  # бандиты, убившие героиню, НЕ дают burst-победу
+			_update_burst(delta)
 	_update_pulse(delta)
+	_update_flash(delta)
 
 ## Сумма WASD + стрелок (физические клавиши — не зависят от раскладки). Диагональ
 ## нормализуется в _process, поэтому все 8 направлений равны по скорости.
@@ -249,6 +276,7 @@ func _make_bandit() -> Node2D:
 	n.add_child(outline)
 
 	n.set_meta("hp", BANDIT_HP)   # Step 2C: HP бандита хранится в метаданных узла
+	n.set_meta("hit_cd", 0.0)     # MVP v1: cooldown контактного удара ЭТОГО бандита
 	return n
 
 ## Бандиты идут по ПРЯМОЙ к героине (без pathfinding). Преследуют, пока она движется.
@@ -259,6 +287,51 @@ func _move_bandits(delta: float) -> void:
 		if to_hero.length() > 1.0:
 			b.position += to_hero.normalized() * BANDIT_SPEED * delta
 		b.position = _clamp_to_arena(b.position, BANDIT_CLAMP_R)
+
+## MVP v1: контактный урон. Бандит в радиусе касания бьёт героиню НЕ каждый кадр, а раз
+## в BANDIT_HIT_COOLDOWN (таймер в meta каждого бандита) → HP не «улетает» мгновенно.
+## Лог один раз на удар: [COMBAT_HERO_HIT] hp=N. HP≤0 → поражение.
+func _apply_bandit_contact(delta: float) -> void:
+	for b: Node2D in _bandits:
+		var cd := float(b.get_meta("hit_cd", 0.0)) - delta
+		if cd > 0.0:
+			b.set_meta("hit_cd", cd)
+			continue
+		if _hero_pos.distance_to(b.position) > HERO_HIT_RANGE:
+			b.set_meta("hit_cd", 0.0)
+			continue
+		b.set_meta("hit_cd", BANDIT_HIT_COOLDOWN)
+		_hero_hp = maxi(_hero_hp - BANDIT_DAMAGE, 0)
+		_flash_hero()
+		_update_hp()
+		print("[COMBAT_HERO_HIT] hp=%d" % _hero_hp)
+		if _hero_hp <= 0:
+			_lose()
+			return
+
+## Короткий красный flash тела героини при попадании (визуальный сигнал урона).
+func _flash_hero() -> void:
+	_hero_flash_t = HERO_FLASH_TIME
+	if _hero_body != null:
+		_hero_body.color = HERO_HIT_COLOR
+
+## Затухание flash от красного к базовому цвету.
+func _update_flash(delta: float) -> void:
+	if _hero_flash_t <= 0.0:
+		return
+	_hero_flash_t -= delta
+	if _hero_body == null:
+		return
+	if _hero_flash_t <= 0.0:
+		_hero_body.color = HERO_BODY_COLOR
+		return
+	var t := clampf(_hero_flash_t / HERO_FLASH_TIME, 0.0, 1.0)
+	_hero_body.color = HERO_BODY_COLOR.lerp(HERO_HIT_COLOR, t)
+
+## Обновить лейбл «HP: N».
+func _update_hp() -> void:
+	if _hp_label != null:
+		_hp_label.text = "HP: %d" % _hero_hp
 
 ## Кольцо-пульс burst-атаки (дочернее _hero → следует за героиней). Старт прозрачное.
 func _build_burst_visual() -> void:
@@ -324,32 +397,52 @@ func _update_count() -> void:
 	if _count_label != null:
 		_count_label.text = "Бандитов: %d" % _bandits.size()
 
-## Кнопка «Продолжить» (видна только после победы) → возврат на карту.
+## Кнопка действия: после победы «Продолжить» → карта; после поражения «Повторить бой».
 func _on_action() -> void:
 	if _won:
 		_return_to_map()
+	elif _lost:
+		_retry_combat()
 
-## До победы ввод бой НЕ завершает (победа только зачисткой). После победы Enter/клик
-## = «Продолжить».
+## До исхода боя ввод его НЕ завершает (победа — только зачисткой, поражение — по HP).
+## После победы/поражения Enter/клик = соответствующее действие кнопки.
 func _unhandled_input(event: InputEvent) -> void:
-	if not _won:
+	if not _won and not _lost:
 		return
 	if event.is_action_pressed("ui_accept") \
 			or (event is InputEventMouseButton and event.pressed):
-		_return_to_map()
+		_on_action()
 
 ## Победа по зачистке всех бандитов (Step 2D). Guard _won → награда не начисляется
 ## дважды. Step 1 контракт без изменений (RunState.resolve_combat_win + возврат).
 func _win() -> void:
-	if _won:
+	if _won or _lost:
 		return
 	_won = true
 	RunState.resolve_combat_win()
 	_title.text = "Победа!"
-	_hint.text = "Путь свободен. Награда: %s (заглушка). Нажми «Продолжить»." \
+	_hint.text = "Путь свободен. Награда: %s. Нажми «Продолжить»." \
 		% RunState.last_combat_reward
 	if _count_label != null:
 		_count_label.visible = false
+	_action_btn.text = "Продолжить"
+	_action_btn.visible = true
+	_action_btn.grab_focus()
+
+## Поражение по HP≤0 (MVP v1). Guard _won/_lost → не пересекается с победой (в _process
+## контакт обрабатывается ДО burst, поэтому при одновременном исходе побеждает поражение).
+## Бой стоп — _process gated по _lost. Исход «Повторить бой» = reload текущей сцены:
+## карту/RunState не трогаем, дедуп засады уже выставлен → герой не уезжает вперёд.
+func _lose() -> void:
+	if _won or _lost:
+		return
+	_lost = true
+	print("[COMBAT_DEFEAT] hp=0")
+	_title.text = "Поражение"
+	_hint.text = "Ты пал в засаде"
+	if _count_label != null:
+		_count_label.visible = false
+	_action_btn.text = "Повторить бой"
 	_action_btn.visible = true
 	_action_btn.grab_focus()
 
@@ -359,3 +452,12 @@ func _return_to_map() -> void:
 	_returning = true
 	print("[COMBAT] return to map result=win")
 	get_tree().change_scene_to_file(RETURN_SCENE)
+
+## Повторить бой заново (после поражения). Перезагрузка сцены — самый безопасный исход:
+## return-контекст живёт в autoload RunState, дедуп засады уже в fired_encounters.
+func _retry_combat() -> void:
+	if _returning:
+		return
+	_returning = true
+	print("[COMBAT] retry after defeat")
+	get_tree().reload_current_scene()
