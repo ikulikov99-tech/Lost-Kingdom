@@ -1,0 +1,562 @@
+{
+  "note": "Generated from Main.tscn Curve2D _data + MapTuningMarkers. POS = curve points (world). baked_length is chord-length approx. MOVEMENT MODEL = DIRECTION-STEP: a click NEAR the hero sets a direction; the road whose end-direction best matches is chosen and the hero steps a fixed ROAD_CLICK_STEP along its offset (move_toward to dest_off) — click projection on the curve is NOT used, so bends/loops never stall and you needn't aim at the line or click into fog. Reaching a road endpoint = 'reached node' (navigation: current_location/discovered/open next roads, NO quest). Entering a location (quest/action) = a separate click on its icon/marker within ICON_CLICK_R. The sample points below are reference coords only — you do NOT need to click them. NB: Village waypoint marker is at (-958,-530), the three Village curves meet at the unchanged junction (-888,-504).",
+  "waypoints": {
+    "Castle": {
+      "pos": [
+        -1088,
+        -720
+      ],
+      "reveal": [
+        -1200,
+        -816
+      ]
+    },
+    "Village": {
+      "pos": [
+        -958,
+        -530
+      ],
+      "junction": [
+        -888,
+        -504
+      ],
+      "reveal": [
+        -1016,
+        -552
+      ]
+    },
+    "Dock": {
+      "pos": [
+        -1160,
+        -128
+      ],
+      "reveal": [
+        -1296,
+        -192
+      ]
+    },
+    "KnightRuins": {
+      "pos": [
+        -792,
+        -288
+      ],
+      "reveal": [
+        -704,
+        -400
+      ]
+    },
+    "MageTower": {
+      "pos": [
+        -552,
+        -272
+      ],
+      "reveal": [
+        -496,
+        -248
+      ]
+    },
+    "EarthMageCastle": {
+      "pos": [
+        -432,
+        -600
+      ],
+      "reveal": [
+        -512,
+        -624
+      ]
+    },
+    "DarkCastle": {
+      "pos": [
+        -176,
+        -744
+      ],
+      "reveal": [
+        -200,
+        -640
+      ]
+    },
+    "Lumbermill": {
+      "pos": [
+        -624,
+        -760
+      ],
+      "reveal": [
+        -680,
+        -832
+      ]
+    },
+    "Mine": {
+      "pos": [
+        -376,
+        -816
+      ],
+      "reveal": [
+        -416,
+        -944
+      ]
+    }
+  },
+  "active_roads": [
+    {
+      "road_id": "CastleVillagePath",
+      "curve": "Curve2D_castle_village",
+      "from": "Castle",
+      "to": "Village",
+      "baked_length_approx": 424,
+      "start": [
+        -1088,
+        -720
+      ],
+      "end": [
+        -888,
+        -504
+      ],
+      "dir_from_Castle": "SE ↘",
+      "dir_from_Village": "SE ↘",
+      "samples": [
+        {
+          "offset": 0,
+          "pos": [
+            -1088,
+            -720
+          ],
+          "note": "Castle side (curve start)"
+        },
+        {
+          "offset": 120,
+          "pos": [
+            -1002,
+            -643
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 240,
+          "pos": [
+            -890,
+            -601
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 360,
+          "pos": [
+            -842,
+            -512
+          ],
+          "note": "approach Village / junction"
+        },
+        {
+          "offset": "end",
+          "pos": [
+            -888,
+            -504
+          ],
+          "note": "Village endpoint"
+        }
+      ]
+    },
+    {
+      "road_id": "VillageDockPath",
+      "curve": "Curve2D_village_dock",
+      "from": "Village",
+      "to": "Dock",
+      "baked_length_approx": 759,
+      "start": [
+        -888,
+        -504
+      ],
+      "end": [
+        -1160,
+        -128
+      ],
+      "dir_from_Village": "SE ↘",
+      "dir_from_Dock": "E →",
+      "samples": [
+        {
+          "offset": 0,
+          "pos": [
+            -888,
+            -504
+          ],
+          "note": "Village side (curve start)"
+        },
+        {
+          "offset": 120,
+          "pos": [
+            -927,
+            -446
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 240,
+          "pos": [
+            -960,
+            -381
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 360,
+          "pos": [
+            -903,
+            -295
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 480,
+          "pos": [
+            -905,
+            -213
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 600,
+          "pos": [
+            -1004,
+            -146
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 720,
+          "pos": [
+            -1121,
+            -130
+          ],
+          "note": "approach Dock / junction"
+        },
+        {
+          "offset": "end",
+          "pos": [
+            -1160,
+            -128
+          ],
+          "note": "Dock endpoint"
+        }
+      ]
+    },
+    {
+      "road_id": "DockKnightRuinsPath",
+      "curve": "Curve2D_dock_knightruins",
+      "from": "Dock",
+      "to": "KnightRuins",
+      "baked_length_approx": 426,
+      "start": [
+        -1160,
+        -128
+      ],
+      "end": [
+        -792,
+        -288
+      ],
+      "dir_from_Dock": "E →",
+      "dir_from_KnightRuins": "SW ↙",
+      "samples": [
+        {
+          "offset": 0,
+          "pos": [
+            -1160,
+            -128
+          ],
+          "note": "Dock side (curve start)"
+        },
+        {
+          "offset": 120,
+          "pos": [
+            -1041,
+            -136
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 240,
+          "pos": [
+            -935,
+            -189
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 360,
+          "pos": [
+            -832,
+            -240
+          ],
+          "note": "approach KnightRuins / junction"
+        },
+        {
+          "offset": "end",
+          "pos": [
+            -792,
+            -288
+          ],
+          "note": "KnightRuins endpoint"
+        }
+      ]
+    },
+    {
+      "road_id": "VillageLumbermillPath",
+      "curve": "Curve2D_village_lumbermill",
+      "from": "Village",
+      "to": "Lumbermill",
+      "baked_length_approx": 469,
+      "start": [
+        -888,
+        -504
+      ],
+      "end": [
+        -620,
+        -764
+      ],
+      "dir_from_Village": "SE ↘",
+      "dir_from_Lumbermill": "SE ↘",
+      "samples": [
+        {
+          "offset": 0,
+          "pos": [
+            -888,
+            -504
+          ],
+          "note": "Village side (curve start)"
+        },
+        {
+          "offset": 120,
+          "pos": [
+            -839,
+            -565
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 240,
+          "pos": [
+            -747,
+            -637
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 360,
+          "pos": [
+            -638,
+            -685
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": "end",
+          "pos": [
+            -620,
+            -764
+          ],
+          "note": "Lumbermill endpoint"
+        }
+      ]
+    },
+    {
+      "road_id": "LumbermillMinePath",
+      "curve": "Curve2D_lumbermill_mine",
+      "from": "Lumbermill",
+      "to": "Mine",
+      "baked_length_approx": 284,
+      "start": [
+        -620,
+        -764
+      ],
+      "end": [
+        -368,
+        -824
+      ],
+      "dir_from_Lumbermill": "SE ↘",
+      "dir_from_Mine": "W ←",
+      "samples": [
+        {
+          "offset": 0,
+          "pos": [
+            -620,
+            -764
+          ],
+          "note": "Lumbermill side (curve start)"
+        },
+        {
+          "offset": 120,
+          "pos": [
+            -513,
+            -750
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 240,
+          "pos": [
+            -409,
+            -807
+          ],
+          "note": "approach Mine / junction"
+        },
+        {
+          "offset": "end",
+          "pos": [
+            -368,
+            -824
+          ],
+          "note": "Mine endpoint"
+        }
+      ]
+    },
+    {
+      "road_id": "KnightRuinsMageTowerPath",
+      "curve": "Curve2D_knightruins_magetower",
+      "from": "KnightRuins",
+      "to": "MageTower",
+      "baked_length_approx": 372,
+      "start": [
+        -792,
+        -288
+      ],
+      "end": [
+        -552,
+        -268
+      ],
+      "dir_from_KnightRuins": "SW ↙",
+      "dir_from_MageTower": "NW ↖",
+      "samples": [
+        {
+          "offset": 0,
+          "pos": [
+            -792,
+            -288
+          ],
+          "note": "KnightRuins side (curve start)"
+        },
+        {
+          "offset": 120,
+          "pos": [
+            -767,
+            -227
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 240,
+          "pos": [
+            -661,
+            -281
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 360,
+          "pos": [
+            -559,
+            -278
+          ],
+          "note": "approach MageTower / junction"
+        },
+        {
+          "offset": "end",
+          "pos": [
+            -552,
+            -268
+          ],
+          "note": "MageTower endpoint"
+        }
+      ]
+    },
+    {
+      "road_id": "KnightRuinsEarthMagePath",
+      "curve": "Curve2D_knightruins_earthmage",
+      "from": "MageTower",
+      "to": "EarthMageCastle",
+      "baked_length_approx": 473,
+      "start": [
+        -552,
+        -268
+      ],
+      "end": [
+        -432,
+        -600
+      ],
+      "dir_from_MageTower": "NW ↖",
+      "dir_from_EarthMageCastle": "E →",
+      "samples": [
+        {
+          "offset": 0,
+          "pos": [
+            -552,
+            -268
+          ],
+          "note": "MageTower side (curve start)"
+        },
+        {
+          "offset": 120,
+          "pos": [
+            -525,
+            -355
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 240,
+          "pos": [
+            -488,
+            -456
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": 360,
+          "pos": [
+            -398,
+            -526
+          ],
+          "note": "mid road / safe click"
+        },
+        {
+          "offset": "end",
+          "pos": [
+            -432,
+            -600
+          ],
+          "note": "EarthMageCastle endpoint"
+        }
+      ]
+    }
+  ],
+  "disabled_roads": [
+    {
+      "road_id": "VillageRuinsPath",
+      "curve": "Curve2D_village_ruins",
+      "ends": [
+        [
+          -888,
+          -504
+        ],
+        [
+          -792,
+          -288
+        ]
+      ],
+      "reason": "not in ROUTED_PAIRS — ignored by navigation"
+    },
+    {
+      "road_id": "EarthMageDarkCastlePath",
+      "curve": "Curve2D_earthmage_darkcastle",
+      "ends": [
+        [
+          194,
+          46
+        ],
+        [
+          311,
+          -44
+        ]
+      ],
+      "reason": "not in ROUTED_PAIRS — ignored by navigation"
+    }
+  ]
+}

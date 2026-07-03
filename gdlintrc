@@ -1,0 +1,29 @@
+# gdlint config для Lost-Kingdom (соло-проект, Godot 4.6 GDScript)
+# Цель: чистый прогон = реально нет проблем, а не стилевой шум.
+# Запуск:  gdlint Main.gd Hero.gd
+#
+# Отключены чисто стилевые правила, на которые Godot плевать:
+#   class-definitions-order — мы держим свой порядок (const-блоки, V2-секции)
+#   mixed-tabs-and-spaces   — ложно срабатывает на строках-продолжениях
+#                             (таб + пробелы выравнивания); реальный mixed
+#                             всё равно ловит сам парсер Godot
+#   no-else-return / no-elif-return — стилистика, не баги
+disable:
+- class-definitions-order
+- mixed-tabs-and-spaces
+- no-else-return
+- no-elif-return
+
+# Пороги подняты под реальный размер файлов проекта.
+max-line-length: 120
+max-file-lines: 2000
+max-returns: 12
+max-public-methods: 40
+function-arguments-number: 12
+
+# Оставлены включёнными (ловят настоящие баги):
+#   unused-argument, comparison-with-itself, expression-not-assigned,
+#   duplicated-load, unnecessary-pass, trailing-whitespace,
+#   tab-characters, все naming-правила.
+excluded_directories: !!set
+  .git: null

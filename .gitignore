@@ -1,3 +1,22 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+
+# Секреты — никогда не коммитить
+*токен*
+*token*
+*secret*
+*.pem
+*.key
+
+# Локальные скриншоты/артефакты Claude
+.claude/*.png
+
+# Старая карта — не коммитить
+maps/world_map-Old.*
+
+# Локальные patch-бэкапы — не коммитить
+_patch_backups/
+
+# GdUnit4 — генерируемые отчёты тестов, не коммитить (сам addon коммитим)
+reports/

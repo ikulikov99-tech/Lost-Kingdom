@@ -10,14 +10,15 @@ config_version=5
 
 [application]
 
-config/name="Lost kingdom v14"
-run/main_scene="uid://bxkr3wyjwiun5"
+config/name="Lost Kingdom"
+run/main_scene="res://Splash.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
-[physics]
+[autoload]
 
-3d/physics_engine="Jolt Physics"
+GameState="*res://GameState.gd"
+RunState="*res://RunState.gd"
 
 [display]
 
@@ -25,6 +26,10 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/size/resizable=false
 
-[rendering]
+[editor_plugins]
 
-rendering_device/driver.windows="d3d12"
+enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")
+
+[physics]
+
+3d/physics_engine="Jolt Physics"

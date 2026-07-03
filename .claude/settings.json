@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "PowerShell(Get-Process *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-Content *)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(git log *)",
+      "PowerShell(git status *)",
+      "PowerShell(git diff *)",
+      "PowerShell(git branch *)",
+      "PowerShell(Start-Sleep *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(Set-Location *)",
+      "mcp__godot__get_debug_output",
+      "mcp__godot__run_project",
+      "mcp__godot__stop_project",
+      "mcp__godot__connect_remote_debugger",
+      "mcp__godot__get_remote_debug_output",
+      "mcp__godot__list_projects",
+      "mcp__godot__get_project_info",
+      "mcp__godot__get_godot_version",
+      "mcp__ccd_session_mgmt__search_session_transcripts"
+    ]
+  }
+}
